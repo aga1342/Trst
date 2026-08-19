@@ -1,0 +1,2318 @@
+-- CYNS AutoJoiner — cyden-joiner edition
+-- ► Config wird automatisch gespeichert & geladen (cyden-joiner.json)
+-- ► StatusBar + MainFrame nutzen natives Roblox-Dragging (Position wird beim Loslassen gespeichert)
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
+
+local player = Players.LocalPlayer
+
+-- // ================== CONFIG SYSTEM ================== \\ --
+
+local FileName = "cyden-joiner.json"
+
+local DefaultConfig = {
+    Positions = {
+        StatusBar = {X = 0.35, Y = 0.017},
+        MainFrame = {X = 0.36, Y = 0.30},
+    },
+    SoundEnabled  = false,
+    SoundID       = "rbxassetid://6518811702",
+    JoinDuelEnabled = false,
+    AnimalConfigs = {},
+}
+
+local Config = {}
+for k, v in pairs(DefaultConfig) do Config[k] = v end
+Config.Positions    = {}
+for k, v in pairs(DefaultConfig.Positions) do
+    Config.Positions[k] = {X = v.X, Y = v.Y}
+end
+Config.AnimalConfigs = {}
+
+if isfile and isfile(FileName) then
+    pcall(function()
+        local ok, decoded = pcall(function()
+            return HttpService:JSONDecode(readfile(FileName))
+        end)
+        if not ok then return end
+        -- top-level keys
+        for k, v in pairs(DefaultConfig) do
+            if k ~= "Positions" and k ~= "AnimalConfigs" and decoded[k] == nil then
+                decoded[k] = v
+            end
+        end
+        -- positions
+        if decoded.Positions then
+            for k, v in pairs(DefaultConfig.Positions) do
+                if decoded.Positions[k] == nil then decoded.Positions[k] = {X=v.X, Y=v.Y} end
+            end
+        else
+            decoded.Positions = {}
+            for k, v in pairs(DefaultConfig.Positions) do
+                decoded.Positions[k] = {X=v.X, Y=v.Y}
+            end
+        end
+        -- animal configs
+        if not decoded.AnimalConfigs then decoded.AnimalConfigs = {} end
+        Config = decoded
+    end)
+end
+
+local function SaveConfig()
+    if writefile then
+        pcall(function()
+            writefile(FileName, HttpService:JSONEncode(Config))
+        end)
+    end
+end
+
+
+-- // ================== WEBSOCKET CONFIG ================== \\ --
+local WS_URL = "ws://127.0.0.1:51948"
+
+local active_ws    = nil
+local logged_ids   = {}
+local is_connecting = false
+local ws_status    = "OFFLINE"
+
+-- // ================== JOB ID DECRYPTOR ================== \\ --
+
+local function xorDecrypt(encrypted, key)
+    local decrypted = ""
+    local bxor = bit32 and bit32.bxor or (bit and bit.bxor) or function(a, b) return (a + b) % 256 end
+    for i = 1, #encrypted do
+        local charCode = string.byte(encrypted, i)
+        local keyIndex = ((i - 1) % #key) + 1
+        local keyChar  = string.byte(key, keyIndex)
+        decrypted = decrypted .. string.char(bxor(charCode, keyChar))
+    end
+    return decrypted
+end
+
+local function fromBase64(data)
+    local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    data = string.gsub(data, '[^'..b..'=]', '')
+    return (data:gsub('.', function(x)
+        if (x == '=') then return '' end
+        local r, f = '', (b:find(x) - 1)
+        for i = 6, 1, -1 do r = r .. (f % 2^i - f % 2^(i-1) > 0 and '1' or '0') end
+        return r
+    end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+        if (#x ~= 8) then return '' end
+        local c = 0
+        for i = 1, 8 do c = c + (x:sub(i,i) == '1' and 2^(8-i) or 0) end
+        return string.char(c)
+    end))
+end
+
+local function generateKey(baseKey, salt)
+    local combined = baseKey .. salt
+    local key = ""
+    for i = 1, 24 do
+        local index = ((i - 1) % #combined) + 1
+        key = key .. string.char((string.byte(combined, index) * (i + 13)) % 256)
+    end
+    return key
+end
+
+local function decryptJobId(encryptedText)
+    local SECRET_KEY = "AutoJoinerSecret2024"
+    local SALT       = "StrawberryBerry123"
+    if not encryptedText or encryptedText == "" then return encryptedText end
+    if not string.match(encryptedText, "^[A-Za-z0-9+/=]+$") then return encryptedText end
+    if #encryptedText < 20 then return encryptedText end
+    local decoded = fromBase64(encryptedText)
+    if not decoded or decoded == "" then return encryptedText end
+    local key       = generateKey(SECRET_KEY, SALT)
+    local decrypted = xorDecrypt(decoded, key)
+    if #decrypted >= 8 then
+        local prefix   = decrypted:sub(1, 4)
+        local saltPart = decrypted:sub(5, 8)
+        if prefix == "STB_" and saltPart == "Stra" then return decrypted:sub(9) end
+    end
+    local stbPos = decrypted:find("STB_")
+    if stbPos and #decrypted >= stbPos + 8 then return decrypted:sub(stbPos + 8) end
+    local clean = decrypted:gsub("%s+", ""):gsub("%c+", "")
+    if string.match(clean, "^[0-9a-f]+$") and #clean >= 60 and #clean <= 70 then return clean end
+    return encryptedText
+end
+
+-- // ================== TELEPORT FUNKTION ================== \\ --
+
+local function TryTeleport(jobId, retryCount)
+    if not jobId or jobId == "" then return end
+    retryCount = retryCount or 1
+    task.spawn(function()
+        for i = 1, retryCount do
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, player)
+            end)
+            if i < retryCount then task.wait(1.5) end
+        end
+    end)
+end
+
+-- // UI ROOT //
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CynsNotifier"
+ScreenGui.Parent = gethui and gethui() or CoreGui
+ScreenGui.ResetOnSpawn = false
+
+-- Forward-Deklarationen
+local autoJoinEnabled = false
+local autoJoinCircle  = nil
+local SetAutoJoin
+
+-- // ================== STATUS BAR ================== \\ --
+-- Draggbar (Position wird in Config gespeichert)
+
+local _sbPos = Config.Positions.StatusBar
+
+local StatusBar = Instance.new("Frame")
+StatusBar.Name                  = "StatusBar"
+StatusBar.Parent                = ScreenGui
+StatusBar.BackgroundColor3      = Color3.fromRGB(20, 20, 25)
+StatusBar.BackgroundTransparency = 0
+StatusBar.Size                  = UDim2.new(0, 290, 0, 44)
+StatusBar.Position              = UDim2.new(_sbPos.X, 0, _sbPos.Y, 0)
+StatusBar.BorderSizePixel       = 0
+StatusBar.ZIndex                = 300
+Instance.new("UICorner", StatusBar).CornerRadius = UDim.new(0, 9)
+
+local SBStroke = Instance.new("UIStroke", StatusBar)
+SBStroke.Color     = Color3.fromRGB(45, 45, 55)
+SBStroke.Thickness = 1.5
+
+-- Natives Dragging (wie MainFrame)
+StatusBar.Active    = true
+StatusBar.Draggable = true
+
+
+-- Helper: Spalte
+local function MakeStatusColumn(parent, xOffset, dotColor, labelText, valueText)
+    local Dot = Instance.new("Frame")
+    Dot.Parent          = parent
+    Dot.BackgroundColor3 = dotColor
+    Dot.Size            = UDim2.new(0, 7, 0, 7)
+    Dot.Position        = UDim2.new(0, xOffset, 0, 10)
+    Dot.BorderSizePixel = 0
+    Dot.ZIndex          = 301
+    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+
+    local TopLabel = Instance.new("TextLabel")
+    TopLabel.Parent              = parent
+    TopLabel.BackgroundTransparency = 1
+    TopLabel.Position            = UDim2.new(0, xOffset + 12, 0, 6)
+    TopLabel.Size                = UDim2.new(0, 100, 0, 14)
+    TopLabel.Font                = Enum.Font.GothamBold
+    TopLabel.Text                = labelText
+    TopLabel.TextColor3          = Color3.fromRGB(110, 110, 115)
+    TopLabel.TextSize            = 10
+    TopLabel.TextXAlignment      = Enum.TextXAlignment.Left
+    TopLabel.ZIndex              = 301
+
+    local ValLabel = Instance.new("TextLabel")
+    ValLabel.Parent              = parent
+    ValLabel.BackgroundTransparency = 1
+    ValLabel.Position            = UDim2.new(0, xOffset + 12, 0, 22)
+    ValLabel.Size                = UDim2.new(0, 100, 0, 14)
+    ValLabel.Font                = Enum.Font.GothamBold
+    ValLabel.Text                = valueText
+    ValLabel.TextColor3          = Color3.fromRGB(210, 210, 215)
+    ValLabel.TextSize            = 12
+    ValLabel.TextXAlignment      = Enum.TextXAlignment.Left
+    ValLabel.ZIndex              = 301
+
+    return Dot, ValLabel
+end
+
+local function MakeDivider(parent, xOffset)
+    local D = Instance.new("Frame")
+    D.Parent          = parent
+    D.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    D.Size            = UDim2.new(0, 1, 0, 26)
+    D.Position        = UDim2.new(0, xOffset, 0, 9)
+    D.BorderSizePixel = 0
+    D.ZIndex          = 301
+end
+
+local SB_DOT_GREEN  = Color3.fromRGB(0, 220, 100)
+local SB_DOT_RED    = Color3.fromRGB(220, 60, 60)
+local SB_DOT_YELLOW = Color3.fromRGB(255, 180, 0)
+
+local WsDot, WsVal = MakeStatusColumn(StatusBar, 14, SB_DOT_RED, "WebSocket", "Offline")
+
+MakeDivider(StatusBar, 116)
+
+local AjDot, AjVal = MakeStatusColumn(StatusBar, 128, SB_DOT_RED, "Auto Join", "OFF")
+
+local AjClickArea = Instance.new("TextButton")
+AjClickArea.Parent               = StatusBar
+AjClickArea.BackgroundTransparency = 1
+AjClickArea.Position             = UDim2.new(0, 116, 0, 0)
+AjClickArea.Size                 = UDim2.new(0, 90, 1, 0)
+AjClickArea.Text                 = ""
+AjClickArea.ZIndex               = 302
+AjClickArea.MouseButton1Click:Connect(function()
+    SetAutoJoin(not autoJoinEnabled)
+    -- Auto Join wird NICHT gespeichert (per Anforderung)
+end)
+
+-- ── Join Duel — mit gespeichertem Zustand ──────────────────────
+local jdEnabled = Config.JoinDuelEnabled
+local JdDot, JdVal = MakeStatusColumn(StatusBar, 218, SB_DOT_RED, "Join Duel", "OFF")
+
+local JdClickArea = Instance.new("TextButton")
+JdClickArea.Parent               = StatusBar
+JdClickArea.BackgroundTransparency = 1
+JdClickArea.Position             = UDim2.new(0, 206, 0, 0)
+JdClickArea.Size                 = UDim2.new(0, 84, 1, 0)
+JdClickArea.Text                 = ""
+JdClickArea.ZIndex               = 302
+JdClickArea.MouseButton1Click:Connect(function()
+    jdEnabled = not jdEnabled
+    if jdEnabled then
+        JdDot.BackgroundColor3 = SB_DOT_GREEN
+        JdVal.Text = "ON"
+        JdVal.TextColor3 = SB_DOT_GREEN
+    else
+        JdDot.BackgroundColor3 = SB_DOT_RED
+        JdVal.Text = "OFF"
+        JdVal.TextColor3 = Color3.fromRGB(110, 110, 115)
+    end
+    -- Config speichern
+    Config.JoinDuelEnabled = jdEnabled
+    SaveConfig()
+end)
+
+-- Gespeicherten JD-Zustand sofort anzeigen
+if jdEnabled then
+    JdDot.BackgroundColor3 = SB_DOT_GREEN
+    JdVal.Text = "ON"
+    JdVal.TextColor3 = SB_DOT_GREEN
+end
+
+-- Updater-Funktionen
+local function UpdateWsStatusBar(state)
+    if state == "CONNECTED" then
+        WsDot.BackgroundColor3 = SB_DOT_GREEN
+        WsVal.Text = "Connected"
+        WsVal.TextColor3 = SB_DOT_GREEN
+    elseif state == "CONNECTING" then
+        WsDot.BackgroundColor3 = SB_DOT_YELLOW
+        WsVal.Text = "Connecting..."
+        WsVal.TextColor3 = SB_DOT_YELLOW
+    else
+        WsDot.BackgroundColor3 = SB_DOT_RED
+        WsVal.Text = "Offline"
+        WsVal.TextColor3 = Color3.fromRGB(110, 110, 115)
+    end
+end
+
+local function UpdateAutoJoinStatusBar(enabled)
+    if enabled then
+        AjDot.BackgroundColor3 = SB_DOT_GREEN
+        AjVal.Text = "ON"
+        AjVal.TextColor3 = SB_DOT_GREEN
+    else
+        AjDot.BackgroundColor3 = SB_DOT_RED
+        AjVal.Text = "OFF"
+        AjVal.TextColor3 = Color3.fromRGB(110, 110, 115)
+    end
+end
+
+-- // ================================================================= \\ --
+
+local COLORS = {
+    MainBG              = Color3.fromRGB(13, 13, 17),
+    HeaderBG            = Color3.fromRGB(20, 20, 25),
+    Stroke              = Color3.fromRGB(45, 45, 55),
+    TextWhite           = Color3.fromRGB(255, 255, 255),
+    TextGray            = Color3.fromRGB(110, 110, 115),
+    CyanAccent          = Color3.fromRGB(210, 210, 215),
+    GreenDot            = Color3.fromRGB(210, 210, 215),
+    MinimizeContainerBG = Color3.fromRGB(20, 20, 25),
+    TabInactive         = Color3.fromRGB(110, 110, 115),
+    TabActive           = Color3.fromRGB(210, 210, 215),
+    ButtonBG            = Color3.fromRGB(8, 8, 12),
+}
+
+-- Animal Configs — direkte Referenz auf Config.AnimalConfigs (auto-sync)
+local animalRetryConfigs = {}
+local animalConfigs = Config.AnimalConfigs
+
+-- Retry-Werte aus gespeicherten Configs laden
+for name, cfg in pairs(animalConfigs) do
+    if type(cfg) == "table" and cfg.retry and cfg.retry > 0 then
+        animalRetryConfigs[name] = cfg.retry
+    end
+end
+
+-- // ================== MAIN FRAME ================== \\ --
+
+local _mfPos = Config.Positions.MainFrame
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name              = "MainFrame"
+MainFrame.Parent            = ScreenGui
+MainFrame.BackgroundColor3  = COLORS.MainBG
+MainFrame.Position          = UDim2.new(_mfPos.X, 0, _mfPos.Y, 0)
+MainFrame.Size              = UDim2.new(0, 310, 0, 380)
+MainFrame.BorderSizePixel   = 0
+MainFrame.Active            = true
+MainFrame.Draggable         = true
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color     = COLORS.Stroke
+MainStroke.Thickness = 1.5
+MainStroke.Parent    = MainFrame
+
+-- Header
+local Header = Instance.new("Frame")
+Header.Name             = "Header"
+Header.Parent           = MainFrame
+Header.BackgroundColor3 = COLORS.HeaderBG
+Header.Size             = UDim2.new(1, 0, 0, 48)
+Header.BorderSizePixel  = 0
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 12)
+HeaderCorner.Parent = Header
+
+local HeaderBottomHide = Instance.new("Frame")
+HeaderBottomHide.Parent          = Header
+HeaderBottomHide.BackgroundColor3 = COLORS.HeaderBG
+HeaderBottomHide.BorderSizePixel  = 0
+HeaderBottomHide.Position         = UDim2.new(0, 0, 1, -12)
+HeaderBottomHide.Size             = UDim2.new(1, 0, 0, 12)
+
+-- Position-Tracking via Heartbeat:
+-- Erkennt wenn sich eine UI bewegt hat und speichert automatisch (Debounce 1s)
+local _lastSB = {X = -1, Y = -1}
+local _lastMF = {X = -1, Y = -1}
+local _saveTimer = 0
+RunService.Heartbeat:Connect(function(dt)
+    _saveTimer = _saveTimer + dt
+    if _saveTimer < 0.5 then return end
+    _saveTimer = 0
+
+    local vp   = workspace.CurrentCamera.ViewportSize
+    local sbAP = StatusBar.AbsolutePosition
+    local mfAP = MainFrame.AbsolutePosition
+    local sbX  = math.floor(sbAP.X * 100) / 100
+    local sbY  = math.floor(sbAP.Y * 100) / 100
+    local mfX  = math.floor(mfAP.X * 100) / 100
+    local mfY  = math.floor(mfAP.Y * 100) / 100
+
+    if sbX ~= _lastSB.X or sbY ~= _lastSB.Y or
+       mfX ~= _lastMF.X or mfY ~= _lastMF.Y then
+        _lastSB = {X = sbX, Y = sbY}
+        _lastMF = {X = mfX, Y = mfY}
+        Config.Positions.StatusBar = {X = sbAP.X / vp.X, Y = sbAP.Y / vp.Y}
+        Config.Positions.MainFrame = {X = mfAP.X / vp.X, Y = mfAP.Y / vp.Y}
+        SaveConfig()
+    end
+end)
+
+local StatusDot = Instance.new("Frame")
+StatusDot.Parent          = Header
+StatusDot.BackgroundColor3 = COLORS.GreenDot
+StatusDot.Position        = UDim2.new(0, 18, 0.5, -7)
+StatusDot.Size            = UDim2.new(0, 14, 0, 14)
+StatusDot.BorderSizePixel = 0
+StatusDot.ZIndex          = 10
+
+local DotCorner = Instance.new("UICorner")
+DotCorner.CornerRadius = UDim.new(1, 0)
+DotCorner.Parent = StatusDot
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Parent               = MainFrame
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position             = UDim2.new(0.5, -75, 0, 10)
+TitleLabel.Size                 = UDim2.new(0, 150, 0, 30)
+TitleLabel.Font                 = Enum.Font.GothamBold
+TitleLabel.Text                 = "CYNS NOTIFIER PRIVATE"
+TitleLabel.TextColor3           = COLORS.TextWhite
+TitleLabel.TextSize             = 13
+TitleLabel.TextXAlignment       = Enum.TextXAlignment.Center
+TitleLabel.ZIndex               = 10
+
+-- Minimize Button
+local MinimizeContainer = Instance.new("Frame")
+MinimizeContainer.Parent          = Header
+MinimizeContainer.BackgroundColor3 = COLORS.MinimizeContainerBG
+MinimizeContainer.Position        = UDim2.new(1, -32, 0.5, -12)
+MinimizeContainer.Size            = UDim2.new(0, 24, 0, 24)
+MinimizeContainer.BorderSizePixel = 0
+MinimizeContainer.ZIndex          = 10
+
+local ContainerCorner = Instance.new("UICorner")
+ContainerCorner.CornerRadius = UDim.new(0, 6)
+ContainerCorner.Parent = MinimizeContainer
+
+local ContainerStroke = Instance.new("UIStroke")
+ContainerStroke.Color     = COLORS.Stroke
+ContainerStroke.Thickness = 1
+ContainerStroke.Parent    = MinimizeContainer
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Parent               = MinimizeContainer
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Size                 = UDim2.new(1, 0, 1, 0)
+MinimizeBtn.Font                 = Enum.Font.GothamBold
+MinimizeBtn.Text                 = "−"
+MinimizeBtn.TextColor3           = COLORS.TextGray
+MinimizeBtn.TextSize             = 14
+MinimizeBtn.ZIndex               = 11
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+end)
+
+-- Header Divider
+local HeaderDivider = Instance.new("Frame")
+HeaderDivider.Parent          = MainFrame
+HeaderDivider.BackgroundColor3 = COLORS.Stroke
+HeaderDivider.BorderSizePixel  = 0
+HeaderDivider.Position         = UDim2.new(0, 0, 0, 48)
+HeaderDivider.Size             = UDim2.new(1, 0, 0, 1)
+HeaderDivider.ZIndex           = 2
+
+-- LEFT CONTAINER (Sidebar)
+local LeftContainer = Instance.new("Frame")
+LeftContainer.Name             = "LeftContainer"
+LeftContainer.Parent           = MainFrame
+LeftContainer.BackgroundColor3 = COLORS.HeaderBG
+LeftContainer.Position         = UDim2.new(0, 4, 0, 53)
+LeftContainer.Size             = UDim2.new(0, 50, 1, -57)
+LeftContainer.BorderSizePixel  = 0
+
+local LeftCorner = Instance.new("UICorner")
+LeftCorner.CornerRadius = UDim.new(0, 8)
+LeftCorner.Parent = LeftContainer
+
+-- RIGHT CONTAINER (Content Area)
+local RightContainer = Instance.new("Frame")
+RightContainer.Name              = "RightContainer"
+RightContainer.Parent            = MainFrame
+RightContainer.BackgroundColor3  = COLORS.HeaderBG
+RightContainer.Position          = UDim2.new(0, 59, 0, 53)
+RightContainer.Size              = UDim2.new(1, -63, 1, -57)
+RightContainer.BorderSizePixel   = 0
+RightContainer.ClipsDescendants  = true
+
+local RightCorner = Instance.new("UICorner")
+RightCorner.CornerRadius = UDim.new(0, 8)
+RightCorner.Parent = RightContainer
+
+-- ===== TABS =====
+
+local HomeContent = Instance.new("ScrollingFrame")
+HomeContent.Name                   = "HomeContent"
+HomeContent.Parent                 = RightContainer
+HomeContent.BackgroundTransparency = 1
+HomeContent.Size                   = UDim2.new(1, 0, 1, 0)
+HomeContent.CanvasSize             = UDim2.new(0, 0, 0, 0)
+HomeContent.AutomaticCanvasSize    = Enum.AutomaticSize.Y
+HomeContent.ScrollBarThickness     = 3
+HomeContent.ScrollBarImageColor3   = COLORS.CyanAccent
+HomeContent.BorderSizePixel        = 0
+HomeContent.Visible                = true
+HomeContent.ZIndex                 = 1
+
+local HomePadding = Instance.new("UIPadding")
+HomePadding.PaddingLeft   = UDim.new(0, 8)
+HomePadding.PaddingRight  = UDim.new(0, 8)
+HomePadding.PaddingTop    = UDim.new(0, 8)
+HomePadding.PaddingBottom = UDim.new(0, 8)
+HomePadding.Parent = HomeContent
+
+local HomeLayout = Instance.new("UIListLayout")
+HomeLayout.Parent    = HomeContent
+HomeLayout.SortOrder = Enum.SortOrder.LayoutOrder
+HomeLayout.Padding   = UDim.new(0, 5)
+
+local SettingsContent = Instance.new("ScrollingFrame")
+SettingsContent.Name                   = "SettingsContent"
+SettingsContent.Parent                 = RightContainer
+SettingsContent.BackgroundTransparency = 1
+SettingsContent.Size                   = UDim2.new(1, 0, 1, 0)
+SettingsContent.CanvasSize             = UDim2.new(0, 0, 0, 0)
+SettingsContent.AutomaticCanvasSize    = Enum.AutomaticSize.Y
+SettingsContent.ScrollBarThickness     = 3
+SettingsContent.ScrollBarImageColor3   = COLORS.CyanAccent
+SettingsContent.BorderSizePixel        = 0
+SettingsContent.Visible                = false
+SettingsContent.ZIndex                 = 1
+
+local SettingsPadding = Instance.new("UIPadding")
+SettingsPadding.PaddingLeft   = UDim.new(0, 8)
+SettingsPadding.PaddingRight  = UDim.new(0, 8)
+SettingsPadding.PaddingTop    = UDim.new(0, 8)
+SettingsPadding.PaddingBottom = UDim.new(0, 8)
+SettingsPadding.Parent = SettingsContent
+
+local SettingsLayout = Instance.new("UIListLayout")
+SettingsLayout.Parent    = SettingsContent
+SettingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SettingsLayout.Padding   = UDim.new(0, 5)
+
+local ExtraContent = Instance.new("Frame")
+ExtraContent.Name                   = "ExtraContent"
+ExtraContent.Parent                 = RightContainer
+ExtraContent.BackgroundTransparency = 1
+ExtraContent.Size                   = UDim2.new(1, 0, 1, 0)
+ExtraContent.BorderSizePixel        = 0
+ExtraContent.Visible                = false
+ExtraContent.ZIndex                 = 1
+
+local ExtraPadding = Instance.new("UIPadding")
+ExtraPadding.PaddingLeft   = UDim.new(0, 8)
+ExtraPadding.PaddingRight  = UDim.new(0, 8)
+ExtraPadding.PaddingTop    = UDim.new(0, 8)
+ExtraPadding.PaddingBottom = UDim.new(0, 8)
+ExtraPadding.Parent = ExtraContent
+
+local ExtraLayout = Instance.new("UIListLayout")
+ExtraLayout.Parent    = ExtraContent
+ExtraLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ExtraLayout.Padding   = UDim.new(0, 5)
+
+-- ===== HELPER FUNCTIONS =====
+
+local function CreateSectionTitle(text, order, parent)
+    local Label = Instance.new("TextLabel")
+    Label.BackgroundTransparency = 1
+    Label.Size                   = UDim2.new(1, 0, 0, 13)
+    Label.Font                   = Enum.Font.GothamBold
+    Label.Text                   = text:upper()
+    Label.TextColor3             = COLORS.CyanAccent
+    Label.TextSize               = 10
+    Label.TextXAlignment         = Enum.TextXAlignment.Left
+    Label.LayoutOrder            = order
+    Label.Parent                 = parent
+    Label.ZIndex                 = 2
+    return Label
+end
+
+local function CreateButton(text, order, parent)
+    local Button = Instance.new("TextButton")
+    Button.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    Button.Size             = UDim2.new(1, 0, 0, 32)
+    Button.Font             = Enum.Font.GothamBold
+    Button.Text             = text
+    Button.TextColor3       = COLORS.TextWhite
+    Button.TextSize         = 12
+    Button.LayoutOrder      = order
+    Button.Parent           = parent
+    Button.AutoButtonColor  = false
+    Button.BorderSizePixel  = 0
+    Button.ZIndex           = 2
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Button
+    Button.MouseEnter:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(35, 35, 45)}):Play()
+    end)
+    Button.MouseLeave:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(28, 28, 35)}):Play()
+    end)
+    return Button
+end
+
+local function CreateToggleContainer(text, order, parent)
+    local Container = Instance.new("Frame")
+    Container.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    Container.Size             = UDim2.new(1, 0, 0, 42)
+    Container.LayoutOrder      = order
+    Container.Parent           = parent
+    Container.BorderSizePixel  = 0
+    Container.ZIndex           = 2
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Container
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color     = COLORS.Stroke
+    Stroke.Thickness = 1
+    Stroke.Parent    = Container
+    local Label = Instance.new("TextLabel")
+    Label.Parent               = Container
+    Label.BackgroundTransparency = 1
+    Label.Position             = UDim2.new(0, 12, 0, 0)
+    Label.Size                 = UDim2.new(0.6, 0, 1, 0)
+    Label.Font                 = Enum.Font.GothamBold
+    Label.Text                 = text
+    Label.TextColor3           = COLORS.TextWhite
+    Label.TextSize             = 12
+    Label.TextXAlignment       = Enum.TextXAlignment.Left
+    Label.TextYAlignment       = Enum.TextYAlignment.Center
+    Label.ZIndex               = 3
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Name               = "Toggle"
+    ToggleBtn.Parent             = Container
+    ToggleBtn.BackgroundColor3   = Color3.fromRGB(35, 35, 45)
+    ToggleBtn.Position           = UDim2.new(1, -48, 0.5, -10)
+    ToggleBtn.Size               = UDim2.new(0, 36, 0, 20)
+    ToggleBtn.Text               = ""
+    ToggleBtn.AutoButtonColor    = false
+    ToggleBtn.BorderSizePixel    = 0
+    ToggleBtn.ZIndex             = 3
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(1, 0)
+    ToggleCorner.Parent = ToggleBtn
+    local ToggleStroke = Instance.new("UIStroke")
+    ToggleStroke.Color     = COLORS.Stroke
+    ToggleStroke.Thickness = 1
+    ToggleStroke.Parent    = ToggleBtn
+    local ToggleCircle = Instance.new("Frame")
+    ToggleCircle.Parent          = ToggleBtn
+    ToggleCircle.BackgroundColor3 = COLORS.TextGray
+    ToggleCircle.Position        = UDim2.new(0, 2, 0.5, -7)
+    ToggleCircle.Size            = UDim2.new(0, 14, 0, 14)
+    ToggleCircle.BorderSizePixel = 0
+    ToggleCircle.ZIndex          = 4
+    local CircleCorner = Instance.new("UICorner")
+    CircleCorner.CornerRadius = UDim.new(1, 0)
+    CircleCorner.Parent = ToggleCircle
+    local toggled = false
+    ToggleBtn.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        local targetPos   = toggled and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+        local targetColor = toggled and COLORS.CyanAccent or COLORS.TextGray
+        TweenService:Create(ToggleCircle, TweenInfo.new(0.25), {Position = targetPos, BackgroundColor3 = targetColor}):Play()
+    end)
+    return Container
+end
+
+-- Mutation Farben
+local MUTATION_COLORS = {
+    Rainbow    = Color3.fromRGB(180, 100, 220),
+    Divine     = Color3.fromRGB(220, 190, 80),
+    Cursed     = Color3.fromRGB(130, 60, 200),
+    Radioactive= Color3.fromRGB(80, 200, 60),
+    ["Ying Yang"]= Color3.fromRGB(180, 180, 180),
+    Galaxy     = Color3.fromRGB(60, 90, 210),
+    Lava       = Color3.fromRGB(220, 90, 30),
+    Candy      = Color3.fromRGB(230, 100, 160),
+    Bloodrot   = Color3.fromRGB(180, 30, 40),
+    Diamond    = Color3.fromRGB(100, 200, 230),
+    Gold       = Color3.fromRGB(210, 170, 40),
+}
+local MUTATION_ORDER = {
+    "Rainbow","Divine","Cursed","Radioactive","Ying Yang",
+    "Galaxy","Lava","Candy","Bloodrot","Diamond","Gold"
+}
+
+local H_HEADER     = 30
+local H_INPUTS     = 26
+local H_DUELS      = 26
+local H_MUT_HEADER = 24
+local H_MUT_GRID   = 88
+
+local function calcHeight(exp, mutExp)
+    if not exp    then return H_HEADER end
+    if not mutExp then return H_HEADER + H_INPUTS + H_DUELS + H_MUT_HEADER end
+    return H_HEADER + H_INPUTS + H_DUELS + H_MUT_HEADER + H_MUT_GRID
+end
+
+local function CreateAnimalContainer(name, order, parent)
+    local Container = Instance.new("Frame")
+    Container.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    Container.Size             = UDim2.new(1, 0, 0, H_HEADER)
+    Container.LayoutOrder      = order
+    Container.Parent           = parent
+    Container.BorderSizePixel  = 0
+    Container.ZIndex           = 2
+    Container.ClipsDescendants = true
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Container
+
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color     = COLORS.Stroke
+    Stroke.Thickness = 1
+    Stroke.Parent    = Container
+
+    local HeaderFrame = Instance.new("Frame")
+    HeaderFrame.Parent               = Container
+    HeaderFrame.BackgroundTransparency = 1
+    HeaderFrame.Size                 = UDim2.new(1, 0, 0, H_HEADER)
+    HeaderFrame.BorderSizePixel      = 0
+    HeaderFrame.ZIndex               = 3
+
+    local Label = Instance.new("TextLabel")
+    Label.Parent               = HeaderFrame
+    Label.BackgroundTransparency = 1
+    Label.Position             = UDim2.new(0, 8, 0, 0)
+    Label.Size                 = UDim2.new(1, -64, 1, 0)
+    Label.Font                 = Enum.Font.GothamBold
+    Label.Text                 = name
+    Label.TextColor3           = COLORS.TextWhite
+    Label.TextSize             = 11
+    Label.TextXAlignment       = Enum.TextXAlignment.Left
+    Label.TextYAlignment       = Enum.TextYAlignment.Center
+    Label.ZIndex               = 3
+
+    local ExpandBtn = Instance.new("TextButton")
+    ExpandBtn.Parent             = HeaderFrame
+    ExpandBtn.BackgroundColor3   = Color3.fromRGB(35, 35, 45)
+    ExpandBtn.Position           = UDim2.new(1, -50, 0.5, -9)
+    ExpandBtn.Size               = UDim2.new(0, 18, 0, 18)
+    ExpandBtn.Text               = ""
+    ExpandBtn.AutoButtonColor    = false
+    ExpandBtn.BorderSizePixel    = 0
+    ExpandBtn.ZIndex             = 3
+    Instance.new("UICorner", ExpandBtn).CornerRadius = UDim.new(0, 3)
+    local ExpandStroke = Instance.new("UIStroke")
+    ExpandStroke.Color = COLORS.Stroke; ExpandStroke.Thickness = 1
+    ExpandStroke.Parent = ExpandBtn
+
+    local VSymbol = Instance.new("TextLabel")
+    VSymbol.Parent               = ExpandBtn
+    VSymbol.BackgroundTransparency = 1
+    VSymbol.Size                 = UDim2.new(1, 0, 1, 0)
+    VSymbol.Text                 = "V"
+    VSymbol.Font                 = Enum.Font.GothamBold
+    VSymbol.TextColor3           = COLORS.TextGray
+    VSymbol.TextSize             = 10
+    VSymbol.TextXAlignment       = Enum.TextXAlignment.Center
+    VSymbol.TextYAlignment       = Enum.TextYAlignment.Center
+    VSymbol.ZIndex               = 4
+
+    local CheckBox = Instance.new("TextButton")
+    CheckBox.Parent             = HeaderFrame
+    CheckBox.BackgroundColor3   = Color3.fromRGB(35, 35, 45)
+    CheckBox.Position           = UDim2.new(1, -26, 0.5, -9)
+    CheckBox.Size               = UDim2.new(0, 18, 0, 18)
+    CheckBox.Text               = ""
+    CheckBox.AutoButtonColor    = false
+    CheckBox.BorderSizePixel    = 0
+    CheckBox.ZIndex             = 3
+    Instance.new("UICorner", CheckBox).CornerRadius = UDim.new(0, 3)
+    local CbStroke = Instance.new("UIStroke")
+    CbStroke.Color = COLORS.Stroke; CbStroke.Thickness = 1
+    CbStroke.Parent = CheckBox
+
+    -- MIN / RETRY INPUTS
+    local yInputs = H_HEADER + 4
+
+    local MinLabel = Instance.new("TextLabel")
+    MinLabel.Parent               = Container
+    MinLabel.BackgroundTransparency = 1
+    MinLabel.Position             = UDim2.new(0, 6, 0, yInputs - 2)
+    MinLabel.Size                 = UDim2.new(0.495, -9, 0, 8)
+    MinLabel.Font                 = Enum.Font.GothamBold
+    MinLabel.Text                 = "Min"
+    MinLabel.TextColor3           = COLORS.CyanAccent
+    MinLabel.TextSize             = 9
+    MinLabel.TextXAlignment       = Enum.TextXAlignment.Left
+    MinLabel.Visible              = false; MinLabel.ZIndex = 10
+
+    local MinInput = Instance.new("TextBox")
+    MinInput.Parent               = Container
+    MinInput.BackgroundColor3     = Color3.fromRGB(35, 35, 45)
+    MinInput.Position             = UDim2.new(0, 6, 0, yInputs + 9)
+    MinInput.Size                 = UDim2.new(0.495, -9, 0, 14)
+    MinInput.Font                 = Enum.Font.GothamMedium
+    MinInput.Text                 = ""
+    MinInput.TextColor3           = COLORS.TextWhite
+    MinInput.TextSize             = 10
+    MinInput.PlaceholderText      = "0"
+    MinInput.PlaceholderColor3    = COLORS.TextGray
+    MinInput.Visible              = false; MinInput.BorderSizePixel = 0; MinInput.ZIndex = 10
+    Instance.new("UICorner", MinInput).CornerRadius = UDim.new(0, 3)
+    local MiStroke = Instance.new("UIStroke")
+    MiStroke.Color = COLORS.Stroke; MiStroke.Thickness = 1; MiStroke.Parent = MinInput
+
+    local RetryLabel = Instance.new("TextLabel")
+    RetryLabel.Parent               = Container
+    RetryLabel.BackgroundTransparency = 1
+    RetryLabel.Position             = UDim2.new(0.5, 3, 0, yInputs - 2)
+    RetryLabel.Size                 = UDim2.new(0.495, -9, 0, 8)
+    RetryLabel.Font                 = Enum.Font.GothamBold
+    RetryLabel.Text                 = "Retry"
+    RetryLabel.TextColor3           = COLORS.CyanAccent
+    RetryLabel.TextSize             = 9
+    RetryLabel.TextXAlignment       = Enum.TextXAlignment.Left
+    RetryLabel.Visible              = false; RetryLabel.ZIndex = 10
+
+    local RetryInput = Instance.new("TextBox")
+    RetryInput.Parent               = Container
+    RetryInput.BackgroundColor3     = Color3.fromRGB(35, 35, 45)
+    RetryInput.Position             = UDim2.new(0.5, 3, 0, yInputs + 9)
+    RetryInput.Size                 = UDim2.new(0.495, -9, 0, 14)
+    RetryInput.Font                 = Enum.Font.GothamMedium
+    RetryInput.Text                 = ""
+    RetryInput.TextColor3           = COLORS.TextWhite
+    RetryInput.TextSize             = 10
+    RetryInput.PlaceholderText      = "0"
+    RetryInput.PlaceholderColor3    = COLORS.TextGray
+    RetryInput.Visible              = false; RetryInput.BorderSizePixel = 0; RetryInput.ZIndex = 10
+    Instance.new("UICorner", RetryInput).CornerRadius = UDim.new(0, 3)
+    local RiStroke = Instance.new("UIStroke")
+    RiStroke.Color = COLORS.Stroke; RiStroke.Thickness = 1; RiStroke.Parent = RetryInput
+
+    -- Retry speichern
+    RetryInput.FocusLost:Connect(function()
+        local val = math.floor(tonumber(RetryInput.Text) or 0)
+        if val > 0 then
+            animalRetryConfigs[name] = val
+            if not animalConfigs[name] then animalConfigs[name] = {enabled=false, minMS=0, mutations={}} end
+            animalConfigs[name].retry = val
+            SaveConfig()
+        end
+    end)
+
+    -- Min M/s speichern
+    MinInput.FocusLost:Connect(function()
+        if not animalConfigs[name] then animalConfigs[name] = {enabled=false, minMS=0, mutations={}} end
+        animalConfigs[name].minMS = tonumber(MinInput.Text) or 0
+        SaveConfig()
+    end)
+
+    -- DUELS TOGGLE
+    local yDuels = H_HEADER + H_INPUTS
+
+    local DuelsRow = Instance.new("Frame")
+    DuelsRow.Parent               = Container
+    DuelsRow.BackgroundTransparency = 1
+    DuelsRow.Position             = UDim2.new(0, 0, 0, yDuels)
+    DuelsRow.Size                 = UDim2.new(1, 0, 0, H_DUELS)
+    DuelsRow.Visible              = false; DuelsRow.ZIndex = 4
+
+    local DuelsLabel = Instance.new("TextLabel")
+    DuelsLabel.Parent               = DuelsRow
+    DuelsLabel.BackgroundTransparency = 1
+    DuelsLabel.Position             = UDim2.new(0, 8, 0, 3)
+    DuelsLabel.Size                 = UDim2.new(0.6, 0, 0, 20)
+    DuelsLabel.Font                 = Enum.Font.GothamBold
+    DuelsLabel.Text                 = "Join Duel"
+    DuelsLabel.TextColor3           = COLORS.TextWhite
+    DuelsLabel.TextSize             = 10
+    DuelsLabel.TextXAlignment       = Enum.TextXAlignment.Left
+    DuelsLabel.ZIndex               = 5
+
+    local DuelsToggle = Instance.new("TextButton")
+    DuelsToggle.Parent             = DuelsRow
+    DuelsToggle.BackgroundColor3   = Color3.fromRGB(35, 35, 45)
+    DuelsToggle.Position           = UDim2.new(1, -48, 0.5, -8)
+    DuelsToggle.Size               = UDim2.new(0, 34, 0, 16)
+    DuelsToggle.Text               = ""
+    DuelsToggle.AutoButtonColor    = false
+    DuelsToggle.BorderSizePixel    = 0; DuelsToggle.ZIndex = 5
+    Instance.new("UICorner", DuelsToggle).CornerRadius = UDim.new(1, 0)
+    local DtStroke = Instance.new("UIStroke")
+    DtStroke.Color = COLORS.Stroke; DtStroke.Thickness = 1; DtStroke.Parent = DuelsToggle
+
+    local DuelsCircle = Instance.new("Frame")
+    DuelsCircle.Parent             = DuelsToggle
+    DuelsCircle.BackgroundColor3   = COLORS.TextGray
+    DuelsCircle.Position           = UDim2.new(0, 2, 0.5, -6)
+    DuelsCircle.Size               = UDim2.new(0, 12, 0, 12)
+    DuelsCircle.BorderSizePixel    = 0; DuelsCircle.ZIndex = 6
+    Instance.new("UICorner", DuelsCircle).CornerRadius = UDim.new(1, 0)
+
+    local duelsOn = false
+
+    DuelsToggle.MouseButton1Click:Connect(function()
+        duelsOn = not duelsOn
+        local tp = duelsOn and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
+        local tc = duelsOn and COLORS.CyanAccent or COLORS.TextGray
+        TweenService:Create(DuelsCircle, TweenInfo.new(0.2), {Position = tp, BackgroundColor3 = tc}):Play()
+        -- Config speichern
+        if not animalConfigs[name] then animalConfigs[name] = {enabled=false, minMS=0, mutations={}} end
+        animalConfigs[name].duelsOn = duelsOn
+        SaveConfig()
+    end)
+
+    -- MUTATIONS AUFKLAPPPER
+    local yMutHeader = H_HEADER + H_INPUTS + H_DUELS
+
+    local MutRow = Instance.new("Frame")
+    MutRow.Parent               = Container
+    MutRow.BackgroundTransparency = 1
+    MutRow.Position             = UDim2.new(0, 0, 0, yMutHeader)
+    MutRow.Size                 = UDim2.new(1, 0, 0, H_MUT_HEADER)
+    MutRow.Visible              = false; MutRow.ZIndex = 4
+
+    local MutLabel = Instance.new("TextLabel")
+    MutLabel.Parent               = MutRow
+    MutLabel.BackgroundTransparency = 1
+    MutLabel.Position             = UDim2.new(0, 8, 0, 3)
+    MutLabel.Size                 = UDim2.new(1, -34, 0, 18)
+    MutLabel.Font                 = Enum.Font.GothamBold
+    MutLabel.Text                 = "Mutations"
+    MutLabel.TextColor3           = COLORS.CyanAccent
+    MutLabel.TextSize             = 10
+    MutLabel.TextXAlignment       = Enum.TextXAlignment.Left
+    MutLabel.ZIndex               = 6
+
+    local MutExpandBtn = Instance.new("TextButton")
+    MutExpandBtn.Parent           = MutRow
+    MutExpandBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    MutExpandBtn.Position         = UDim2.new(1, -26, 0.5, -9)
+    MutExpandBtn.Size             = UDim2.new(0, 18, 0, 18)
+    MutExpandBtn.Text             = ""
+    MutExpandBtn.AutoButtonColor  = false
+    MutExpandBtn.BorderSizePixel  = 0; MutExpandBtn.ZIndex = 5
+    Instance.new("UICorner", MutExpandBtn).CornerRadius = UDim.new(0, 3)
+    local MeStroke = Instance.new("UIStroke")
+    MeStroke.Color = COLORS.Stroke; MeStroke.Thickness = 1; MeStroke.Parent = MutExpandBtn
+
+    local MutVSymbol = Instance.new("TextLabel")
+    MutVSymbol.Parent               = MutExpandBtn
+    MutVSymbol.BackgroundTransparency = 1
+    MutVSymbol.Size                 = UDim2.new(1, 0, 1, 0)
+    MutVSymbol.Text                 = "V"
+    MutVSymbol.Font                 = Enum.Font.GothamBold
+    MutVSymbol.TextColor3           = COLORS.TextGray
+    MutVSymbol.TextSize             = 10
+    MutVSymbol.TextXAlignment       = Enum.TextXAlignment.Center
+    MutVSymbol.TextYAlignment       = Enum.TextYAlignment.Center
+    MutVSymbol.ZIndex               = 6
+
+    local yMutGrid = yMutHeader + H_MUT_HEADER
+
+    local MutGrid = Instance.new("Frame")
+    MutGrid.Parent               = Container
+    MutGrid.BackgroundTransparency = 1
+    MutGrid.Position             = UDim2.new(0, 8, 0, yMutGrid)
+    MutGrid.Size                 = UDim2.new(1, -16, 0, H_MUT_GRID)
+    MutGrid.Visible              = false; MutGrid.ZIndex = 5
+
+    local GridLayout = Instance.new("UIGridLayout")
+    GridLayout.Parent               = MutGrid
+    GridLayout.CellSize             = UDim2.new(0, 60, 0, 17)
+    GridLayout.CellPadding          = UDim2.new(0, 4, 0, 4)
+    GridLayout.FillDirection        = Enum.FillDirection.Horizontal
+    GridLayout.HorizontalAlignment  = Enum.HorizontalAlignment.Left
+    GridLayout.SortOrder            = Enum.SortOrder.LayoutOrder
+
+    local mutStates = {}
+    for idx, mutName in ipairs(MUTATION_ORDER) do
+        local pill = Instance.new("TextButton")
+        pill.Name               = mutName
+        pill.Parent             = MutGrid
+        pill.BackgroundColor3   = Color3.fromRGB(35, 35, 45)
+        pill.Size               = UDim2.new(0, 60, 0, 17)
+        pill.Font               = Enum.Font.GothamBold
+        pill.Text               = mutName
+        pill.TextColor3         = COLORS.TextGray
+        pill.TextSize           = 8
+        pill.AutoButtonColor    = false
+        pill.BorderSizePixel    = 0
+        pill.LayoutOrder        = idx
+        pill.ZIndex             = 6
+        Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 4)
+        local pStroke = Instance.new("UIStroke")
+        pStroke.Color = COLORS.Stroke; pStroke.Thickness = 1; pStroke.Parent = pill
+
+        mutStates[mutName] = false
+
+        pill.MouseButton1Click:Connect(function()
+            mutStates[mutName] = not mutStates[mutName]
+            local on = mutStates[mutName]
+            pill.TextColor3 = on and COLORS.TextWhite or COLORS.TextGray
+            pStroke.Color   = COLORS.Stroke
+            pStroke.Thickness = 1
+            if not animalConfigs[name] then animalConfigs[name] = {enabled=false, minMS=0, mutations={}} end
+            if not animalConfigs[name].mutations then animalConfigs[name].mutations = {} end
+            animalConfigs[name].mutations[mutName] = on
+            SaveConfig()
+        end)
+    end
+
+    local toggled    = false
+    local expanded   = false
+    local mutExpanded = false
+
+    CheckBox.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        CheckBox.BackgroundColor3 = toggled and COLORS.CyanAccent or Color3.fromRGB(35, 35, 45)
+        if not animalConfigs[name] then animalConfigs[name] = {enabled=false, minMS=0, mutations={}} end
+        animalConfigs[name].enabled = toggled
+        SaveConfig()
+    end)
+
+    ExpandBtn.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        if not expanded then mutExpanded = false end
+        local targetH = calcHeight(expanded, mutExpanded)
+        TweenService:Create(Container, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(1, 0, 0, targetH)}):Play()
+        TweenService:Create(VSymbol, TweenInfo.new(0.3), {Rotation = expanded and 180 or 0}):Play()
+        MinLabel.Visible   = expanded
+        MinInput.Visible   = expanded
+        RetryLabel.Visible = expanded
+        RetryInput.Visible = expanded
+        DuelsRow.Visible   = expanded
+        MutRow.Visible     = expanded
+        if not expanded then
+            MutGrid.Visible = false
+            TweenService:Create(MutVSymbol, TweenInfo.new(0.3), {Rotation = 0}):Play()
+        end
+    end)
+
+    MutExpandBtn.MouseButton1Click:Connect(function()
+        if not expanded then return end
+        mutExpanded = not mutExpanded
+        MutGrid.Visible = mutExpanded
+        TweenService:Create(MutVSymbol, TweenInfo.new(0.3), {Rotation = mutExpanded and 180 or 0}):Play()
+        local targetH = calcHeight(expanded, mutExpanded)
+        TweenService:Create(Container, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(1, 0, 0, targetH)}):Play()
+    end)
+
+    -- ── GESPEICHERTE CONFIG LADEN & ANWENDEN ────────────────────────────
+    local savedCfg = Config.AnimalConfigs[name]
+    if savedCfg then
+        -- Enabled
+        if savedCfg.enabled == true then
+            toggled = true
+            CheckBox.BackgroundColor3 = COLORS.CyanAccent
+            if not animalConfigs[name] then animalConfigs[name] = {enabled=false, minMS=0, mutations={}} end
+            animalConfigs[name].enabled = true
+        end
+        -- Min M/s
+        if savedCfg.minMS and savedCfg.minMS > 0 then
+            MinInput.Text = tostring(savedCfg.minMS)
+            if not animalConfigs[name] then animalConfigs[name] = {enabled=false, minMS=0, mutations={}} end
+            animalConfigs[name].minMS = savedCfg.minMS
+        end
+        -- Retry
+        if savedCfg.retry and savedCfg.retry > 0 then
+            RetryInput.Text = tostring(savedCfg.retry)
+            animalRetryConfigs[name] = savedCfg.retry
+        end
+        -- Duels
+        if savedCfg.duelsOn == true then
+            duelsOn = true
+            DuelsCircle.Position         = UDim2.new(1, -16, 0.5, -6)
+            DuelsCircle.BackgroundColor3 = COLORS.CyanAccent
+        end
+        -- Mutations
+        if savedCfg.mutations then
+            for mutName, on in pairs(savedCfg.mutations) do
+                if on == true and mutStates[mutName] ~= nil then
+                    mutStates[mutName] = true
+                    local pill = MutGrid:FindFirstChild(mutName)
+                    if pill then pill.TextColor3 = COLORS.TextWhite end
+                    if not animalConfigs[name] then animalConfigs[name] = {enabled=false, minMS=0, mutations={}} end
+                    if not animalConfigs[name].mutations then animalConfigs[name].mutations = {} end
+                    animalConfigs[name].mutations[mutName] = true
+                end
+            end
+        end
+    end
+
+    return Container
+end
+
+-- Forward-Deklarationen für ClearBtn
+local consoleLines  = {}
+local LogsScroll2   = nil
+local autoSpamTasks = {}
+local joinFrame     = nil
+local StopCurrentSpam
+
+-- ===== HOME TAB CONTENT =====
+
+SetAutoJoin = function(enabled)
+    autoJoinEnabled = enabled
+    UpdateAutoJoinStatusBar(enabled)
+    if autoJoinCircle then
+        local tp = enabled and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+        local tc = enabled and COLORS.CyanAccent or COLORS.TextGray
+        TweenService:Create(autoJoinCircle, TweenInfo.new(0.25), {Position = tp, BackgroundColor3 = tc}):Play()
+    end
+    -- Auto Join wird NICHT gespeichert (per Anforderung)
+end
+
+-- // FLOOR UNLOCK
+local UNLOCK_LEVELS = {-2, 15, 32}
+
+local function triggerClosestUnlock(yLevel)
+    local character = player.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local playerY    = yLevel or hrp.Position.Y
+    local Y_THRESHOLD = 5
+    local bestSameLevel, distSame = nil, math.huge
+    local bestFallback,  distFall = nil, math.huge
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return end
+    for _, obj in ipairs(plots:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local part = obj.Parent
+            if part and part:IsA("BasePart") then
+                local dist  = (hrp.Position - part.Position).Magnitude
+                local yDiff = math.abs(playerY - part.Position.Y)
+                if dist < distFall then distFall = dist; bestFallback = obj end
+                if yDiff <= Y_THRESHOLD and dist < distSame then
+                    distSame = dist; bestSameLevel = obj
+                end
+            end
+        end
+    end
+    local target = bestSameLevel or bestFallback
+    if not target then return end
+    if fireproximityprompt then
+        fireproximityprompt(target)
+    else
+        pcall(function() target:InputBegan(Enum.UserInputType.MouseButton1) end)
+        task.wait(0.05)
+        pcall(function() target:InputEnded(Enum.UserInputType.MouseButton1) end)
+    end
+end
+
+-- Error Suppressor
+local errorSuppressConn = GuiService.ErrorMessageChanged:Connect(function(msg)
+    if msg ~= "" then pcall(function() GuiService:ClearError() end) end
+end)
+task.spawn(function()
+    while true do
+        pcall(function() GuiService:ClearError() end)
+        task.wait(0.5)
+    end
+end)
+
+-- HOME TAB BUTTONS
+
+CreateSectionTitle("Auto Join", 1, HomeContent)
+local autoJoinContainer = CreateToggleContainer("Auto Join", 2, HomeContent)
+local autoJoinToggleBtn = autoJoinContainer:FindFirstChild("Toggle")
+if autoJoinToggleBtn then
+    autoJoinCircle = autoJoinToggleBtn:FindFirstChildOfClass("Frame")
+    autoJoinToggleBtn.MouseButton1Click:Connect(function()
+        SetAutoJoin(not autoJoinEnabled)
+    end)
+end
+
+CreateSectionTitle("Buy Door", 3, HomeContent)
+local BuyFloor1Btn = CreateButton("Buy Floor 1", 4, HomeContent)
+local BuyFloor2Btn = CreateButton("Buy Floor 2", 5, HomeContent)
+local BuyFloor3Btn = CreateButton("Buy Floor 3", 6, HomeContent)
+
+BuyFloor1Btn.MouseButton1Click:Connect(function() triggerClosestUnlock(UNLOCK_LEVELS[1]) end)
+BuyFloor2Btn.MouseButton1Click:Connect(function() triggerClosestUnlock(UNLOCK_LEVELS[2]) end)
+BuyFloor3Btn.MouseButton1Click:Connect(function() triggerClosestUnlock(UNLOCK_LEVELS[3]) end)
+
+CreateSectionTitle("Actions", 7, HomeContent)
+
+local ClearBtn = CreateButton("Clear Teleport Queue", 8, HomeContent)
+ClearBtn.MouseButton1Click:Connect(function()
+    StopCurrentSpam()
+    for k, _ in pairs(autoSpamTasks) do autoSpamTasks[k] = nil end
+    if joinFrame and joinFrame.Parent then joinFrame:Destroy(); joinFrame = nil end
+    for _, lbl in ipairs(consoleLines) do pcall(function() lbl:Destroy() end) end
+    consoleLines = {}
+    for _, child in ipairs(LogsScroll2:GetChildren()) do
+        if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+            pcall(function() child:Destroy() end)
+        end
+    end
+    logged_ids = {}
+    pcall(function() GuiService:ClearError() end)
+    AddConsoleEntry("system", "0", "queue", "cleared")
+end)
+
+local RejoinBtn = CreateButton("Rejoin Server", 9, HomeContent)
+RejoinBtn.MouseButton1Click:Connect(function()
+    pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
+end)
+
+-- MANUAL JOIN (Text wird NICHT gespeichert)
+CreateSectionTitle("Manual Join", 10, HomeContent)
+local JobIdContainer = Instance.new("Frame")
+JobIdContainer.Name             = "JobIdContainer"
+JobIdContainer.Parent           = HomeContent
+JobIdContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+JobIdContainer.Size             = UDim2.new(1, 0, 0, 65)
+JobIdContainer.LayoutOrder      = 11
+JobIdContainer.BorderSizePixel  = 0
+JobIdContainer.ZIndex           = 2
+
+local JobIdCorner = Instance.new("UICorner")
+JobIdCorner.CornerRadius = UDim.new(0, 6)
+JobIdCorner.Parent = JobIdContainer
+
+local JobIdStroke = Instance.new("UIStroke")
+JobIdStroke.Color     = COLORS.Stroke
+JobIdStroke.Thickness = 1
+JobIdStroke.Parent    = JobIdContainer
+
+local JobIdLabel = Instance.new("TextLabel")
+JobIdLabel.Parent               = JobIdContainer
+JobIdLabel.BackgroundTransparency = 1
+JobIdLabel.Position             = UDim2.new(0, 12, 0, 8)
+JobIdLabel.Size                 = UDim2.new(1, -24, 0, 15)
+JobIdLabel.Font                 = Enum.Font.GothamBold
+JobIdLabel.Text                 = "JobId"
+JobIdLabel.TextColor3           = COLORS.TextWhite
+JobIdLabel.TextSize             = 11
+JobIdLabel.TextXAlignment       = Enum.TextXAlignment.Left
+JobIdLabel.ZIndex               = 3
+
+local JobIdInput = Instance.new("TextBox")
+JobIdInput.Parent             = JobIdContainer
+JobIdInput.BackgroundColor3   = Color3.fromRGB(35, 35, 45)
+JobIdInput.Position           = UDim2.new(0, 10, 0, 28)
+JobIdInput.Size               = UDim2.new(1, -20, 0, 28)
+JobIdInput.Font               = Enum.Font.GothamMedium
+JobIdInput.Text               = ""
+JobIdInput.TextColor3         = COLORS.TextWhite
+JobIdInput.TextSize           = 11
+JobIdInput.PlaceholderText    = "Paste JobId here..."
+JobIdInput.PlaceholderColor3  = COLORS.TextGray
+JobIdInput.BorderSizePixel    = 0
+JobIdInput.ZIndex             = 3
+
+local InputCorner = Instance.new("UICorner")
+InputCorner.CornerRadius = UDim.new(0, 4)
+InputCorner.Parent = JobIdInput
+
+local InputStroke = Instance.new("UIStroke")
+InputStroke.Color     = COLORS.Stroke
+InputStroke.Thickness = 1
+InputStroke.Parent    = JobIdInput
+
+local JoinServerBtn = CreateButton("Join Server", 12, HomeContent)
+JoinServerBtn.Size = UDim2.new(1, 0, 0, 32)
+
+-- SOUND (mit Config-Laden und Speichern)
+CreateSectionTitle("Sound", 13, HomeContent)
+
+-- Gespeicherte Sound-Werte laden
+local soundToggled  = Config.SoundEnabled
+local currentSoundID = Config.SoundID or "rbxassetid://6518811702"
+
+local SoundContainer = Instance.new("Frame")
+SoundContainer.Name             = "SoundContainer"
+SoundContainer.Parent           = HomeContent
+SoundContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+SoundContainer.Size             = UDim2.new(1, 0, 0, soundToggled and 100 or 42)
+SoundContainer.LayoutOrder      = 14
+SoundContainer.BorderSizePixel  = 0
+SoundContainer.ZIndex           = 2
+SoundContainer.ClipsDescendants = true
+
+local SoundCorner = Instance.new("UICorner")
+SoundCorner.CornerRadius = UDim.new(0, 6)
+SoundCorner.Parent = SoundContainer
+
+local SoundStroke = Instance.new("UIStroke")
+SoundStroke.Color     = COLORS.Stroke
+SoundStroke.Thickness = 1
+SoundStroke.Parent    = SoundContainer
+
+local SoundLabel = Instance.new("TextLabel")
+SoundLabel.Parent               = SoundContainer
+SoundLabel.BackgroundTransparency = 1
+SoundLabel.Position             = UDim2.new(0, 12, 0, 0)
+SoundLabel.Size                 = UDim2.new(0.6, 0, 0, 42)
+SoundLabel.Font                 = Enum.Font.GothamBold
+SoundLabel.Text                 = "Sound Enabled"
+SoundLabel.TextColor3           = COLORS.TextWhite
+SoundLabel.TextSize             = 12
+SoundLabel.TextXAlignment       = Enum.TextXAlignment.Left
+SoundLabel.TextYAlignment       = Enum.TextYAlignment.Center
+SoundLabel.ZIndex               = 3
+
+local SoundToggleBtn = Instance.new("TextButton")
+SoundToggleBtn.Name               = "Toggle"
+SoundToggleBtn.Parent             = SoundContainer
+SoundToggleBtn.BackgroundColor3   = Color3.fromRGB(35, 35, 45)
+SoundToggleBtn.Position           = UDim2.new(1, -48, 0, 11)
+SoundToggleBtn.Size               = UDim2.new(0, 36, 0, 20)
+SoundToggleBtn.Text               = ""
+SoundToggleBtn.AutoButtonColor    = false
+SoundToggleBtn.BorderSizePixel    = 0
+SoundToggleBtn.ZIndex             = 3
+
+local SoundToggleCorner = Instance.new("UICorner")
+SoundToggleCorner.CornerRadius = UDim.new(1, 0)
+SoundToggleCorner.Parent = SoundToggleBtn
+
+local SoundToggleStroke = Instance.new("UIStroke")
+SoundToggleStroke.Color     = COLORS.Stroke
+SoundToggleStroke.Thickness = 1
+SoundToggleStroke.Parent    = SoundToggleBtn
+
+local SoundToggleCircle = Instance.new("Frame")
+SoundToggleCircle.Parent             = SoundToggleBtn
+SoundToggleCircle.BackgroundColor3   = COLORS.TextGray
+SoundToggleCircle.Position           = UDim2.new(0, 2, 0.5, -7)
+SoundToggleCircle.Size               = UDim2.new(0, 14, 0, 14)
+SoundToggleCircle.BorderSizePixel    = 0
+SoundToggleCircle.ZIndex             = 4
+
+local SoundCircleCorner = Instance.new("UICorner")
+SoundCircleCorner.CornerRadius = UDim.new(1, 0)
+SoundCircleCorner.Parent = SoundToggleCircle
+
+local SoundIDLabel = Instance.new("TextLabel")
+SoundIDLabel.Parent               = SoundContainer
+SoundIDLabel.BackgroundTransparency = 1
+SoundIDLabel.Position             = UDim2.new(0, 12, 0, 42)
+SoundIDLabel.Size                 = UDim2.new(1, -24, 0, 15)
+SoundIDLabel.Font                 = Enum.Font.GothamBold
+SoundIDLabel.Text                 = "Sound ID"
+SoundIDLabel.TextColor3           = COLORS.CyanAccent
+SoundIDLabel.TextSize             = 10
+SoundIDLabel.TextXAlignment       = Enum.TextXAlignment.Left
+SoundIDLabel.Visible              = soundToggled
+SoundIDLabel.ZIndex               = 3
+
+local SoundIDInput = Instance.new("TextBox")
+SoundIDInput.Parent             = SoundContainer
+SoundIDInput.BackgroundColor3   = Color3.fromRGB(35, 35, 45)
+SoundIDInput.Position           = UDim2.new(0, 10, 0, 60)
+SoundIDInput.Size               = UDim2.new(1, -20, 0, 28)
+SoundIDInput.Font               = Enum.Font.GothamMedium
+SoundIDInput.Text               = currentSoundID:gsub("rbxassetid://", "")
+SoundIDInput.TextColor3         = COLORS.TextWhite
+SoundIDInput.TextSize           = 11
+SoundIDInput.PlaceholderText    = "Enter Sound ID..."
+SoundIDInput.PlaceholderColor3  = COLORS.TextGray
+SoundIDInput.Visible            = soundToggled
+SoundIDInput.BorderSizePixel    = 0
+SoundIDInput.ZIndex             = 3
+
+local SoundInputCorner = Instance.new("UICorner")
+SoundInputCorner.CornerRadius = UDim.new(0, 4)
+SoundInputCorner.Parent = SoundIDInput
+
+local SoundInputStroke = Instance.new("UIStroke")
+SoundInputStroke.Color     = COLORS.Stroke
+SoundInputStroke.Thickness = 1
+SoundInputStroke.Parent    = SoundIDInput
+
+-- Gespeicherten Sound-Toggle-Zustand visual anwenden
+if soundToggled then
+    SoundToggleCircle.Position         = UDim2.new(1, -18, 0.5, -7)
+    SoundToggleCircle.BackgroundColor3 = COLORS.CyanAccent
+end
+
+SoundToggleBtn.MouseButton1Click:Connect(function()
+    soundToggled = not soundToggled
+    local targetPos   = soundToggled and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
+    local targetColor = soundToggled and COLORS.CyanAccent or COLORS.TextGray
+    TweenService:Create(SoundToggleCircle, TweenInfo.new(0.25), {Position = targetPos, BackgroundColor3 = targetColor}):Play()
+    local targetH = soundToggled and 100 or 42
+    TweenService:Create(SoundContainer, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = UDim2.new(1, 0, 0, targetH)}):Play()
+    SoundIDLabel.Visible = soundToggled
+    SoundIDInput.Visible = soundToggled
+    -- Config speichern
+    Config.SoundEnabled = soundToggled
+    SaveConfig()
+end)
+
+SoundIDInput.FocusLost:Connect(function()
+    local input = SoundIDInput.Text
+    if input and input ~= "" then
+        if input:match("^%d+$") then
+            currentSoundID = "rbxassetid://" .. input
+        elseif input:match("rbxassetid://%d+") then
+            currentSoundID = input
+        end
+    end
+    -- Config speichern
+    Config.SoundID = currentSoundID
+    SaveConfig()
+end)
+
+local function PlayAlertSound()
+    if not soundToggled then return end
+    local sound = Instance.new("Sound")
+    sound.SoundId = currentSoundID
+    sound.Volume  = 0.5
+    sound.Parent  = ScreenGui
+    sound:Play()
+    sound.Ended:Connect(function() sound:Destroy() end)
+end
+
+-- ===== SETTINGS TAB CONTENT =====
+CreateSectionTitle("Filter", 1, SettingsContent)
+local brainrots = {
+    "Strawberry Elephant", "Meowl", "Headless Horseman", "Skibidi Toilet", "Griffin",
+    "Hydra Dragon Cannelloni", "Dragon Gingerini", "Dragon Cannelloni", "Love Love Bear",
+    "La Supreme Combinasion", "Celestial Pegasus", "Cerberus", "Popcuru and Fizzuru",
+    "Rosey and Teddy", "Capitano Moby", "Cooki and Milki", "Burguro And Fryuro",
+    "Ketupat Bros", "Reinito Sleighito", "Los Amigos", "La Secret Combinasion",
+    "Los Sekolahs", "Signore Carapace", "Fragrama and Chocrama", "La Casa Boo",
+    "La Food Combinasion", "Elefanto Frigo", "Spooky and Pumpky", "Ginger Gerat",
+    "La Ginger Sekolah", "Los Spaghettis", "Sammyni Fattini", "Festive 67",
+    "Ventoliero Pavonero", "Spaghetti Tualetti", "Antonio", "Garama and Madundung",
+    "Nacho Spyder", "Rosetti Tualetti", "Fishino Clownino", "Jolly Jolly Sahur",
+    "Lavadorito Spinito", "Ketchuru and Musturu", "Tirilikalika Tirilikalako",
+    "La Romantic Grande", "Orcaledon", "Swaggy Bros", "Tictac Sahur", "Ketupat Kepat",
+    "La Taco Combinasion", "Tang Tang Keletang", "Lovin Rose", "Los Tacoritas",
+    "Eviledon", "Los Primos", "Esok Sekolah", "La Jolly Grande", "Los Cupids",
+    "Los Puggies", "W or L", "Gobblino Uniciclino", "Tralaledon", "Mieteteira Bicicleteira",
+    "Tuff Toucan", "Chillin Chili", "Chipso and Queso", "Money Money Reindeer",
+    "La Spooky Grande", "Bacuru and Egguru", "Los Bros", "Mariachi Corazoni",
+    "La Extinct Grande", "Los Candies", "Celularcini Viciosini", "Los 67",
+    "Los Mobilis", "Money Money Puggy", "Cigno Fulgoro", "Los Hotspotsitos",
+    "Los Jolly Combinasionas", "Los Spooky Combinasionas", "Los Planitos",
+    "Chicleteira Cupideira", "DJ Panda", "Las Sis", "Spinny Hammy", "Los Sweethearts",
+    "Tacorita Bicicleta", "Chicleteira Noelteira", "Los Combinasionas",
+    "Nuclearo Dinossauro", "Chimnino", "Noo my Heart", "Swag Soda",
+    "Tacorillo Crocodillo", "La Grande Combinasion", "Los 25"
+}
+for i, animal in ipairs(brainrots) do
+    CreateAnimalContainer(animal, i + 1, SettingsContent)
+end
+
+-- ===== EXTRA TAB (CONSOLE & LOGS) =====
+CreateSectionTitle("Console", 1, ExtraContent)
+local CONSOLE_LINE_H  = 13
+local CONSOLE_PADDING = 5
+local CONSOLE_MAX_LINES = 4
+local CONSOLE_H = CONSOLE_MAX_LINES * CONSOLE_LINE_H + CONSOLE_PADDING * 2
+
+local LogsContainer1 = Instance.new("Frame")
+LogsContainer1.Name             = "LogsContainer1"
+LogsContainer1.Parent           = ExtraContent
+LogsContainer1.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+LogsContainer1.Size             = UDim2.new(1, 0, 0, CONSOLE_H)
+LogsContainer1.LayoutOrder      = 2
+LogsContainer1.BorderSizePixel  = 0
+LogsContainer1.ZIndex           = 2
+LogsContainer1.ClipsDescendants = true
+
+local LogsCorner1 = Instance.new("UICorner")
+LogsCorner1.CornerRadius = UDim.new(0, 8)
+LogsCorner1.Parent = LogsContainer1
+
+local LogsStroke1 = Instance.new("UIStroke")
+LogsStroke1.Color     = COLORS.Stroke
+LogsStroke1.Thickness = 1
+LogsStroke1.Parent    = LogsContainer1
+
+local ConsoleInner = Instance.new("Frame")
+ConsoleInner.Name                   = "ConsoleInner"
+ConsoleInner.Parent                 = LogsContainer1
+ConsoleInner.BackgroundTransparency = 1
+ConsoleInner.Position               = UDim2.new(0, CONSOLE_PADDING, 0, CONSOLE_PADDING)
+ConsoleInner.Size                   = UDim2.new(1, -CONSOLE_PADDING * 2, 1, -CONSOLE_PADDING * 2)
+ConsoleInner.ZIndex                 = 3
+
+consoleLines = {}
+
+local function repositionConsoleLines()
+    for i, lbl in ipairs(consoleLines) do
+        lbl.Position = UDim2.new(0, 0, 0, (i - 1) * CONSOLE_LINE_H)
+    end
+end
+
+local function AddConsoleEntry(animalName, msValue, current, total)
+    if #consoleLines >= CONSOLE_MAX_LINES then
+        consoleLines[1]:Destroy()
+        table.remove(consoleLines, 1)
+        repositionConsoleLines()
+    end
+    local timeStr = os.date("%H:%M")
+    local text    = "[" .. timeStr .. "] [" .. current .. "/" .. total .. "] " .. animalName .. " $" .. msValue .. "M/s"
+    local LogLabel = Instance.new("TextLabel")
+    LogLabel.BackgroundTransparency = 1
+    LogLabel.Size               = UDim2.new(1, 0, 0, CONSOLE_LINE_H)
+    LogLabel.Position           = UDim2.new(0, 0, 0, (#consoleLines) * CONSOLE_LINE_H)
+    LogLabel.Font               = Enum.Font.Code
+    LogLabel.Text               = text
+    LogLabel.TextColor3         = COLORS.TextGray
+    LogLabel.TextSize           = 9
+    LogLabel.TextXAlignment     = Enum.TextXAlignment.Left
+    LogLabel.TextTruncate       = Enum.TextTruncate.AtEnd
+    LogLabel.Parent             = ConsoleInner
+    LogLabel.ZIndex             = 4
+    table.insert(consoleLines, LogLabel)
+    return LogLabel
+end
+
+AddConsoleEntry("system", "0.0", "ready", "ok")
+
+CreateSectionTitle("Logs", 3, ExtraContent)
+local LogsContainer2 = Instance.new("Frame")
+LogsContainer2.Name             = "LogsContainer2"
+LogsContainer2.Parent           = ExtraContent
+LogsContainer2.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+LogsContainer2.Size             = UDim2.new(1, 0, 0, 204)
+LogsContainer2.LayoutOrder      = 4
+LogsContainer2.BorderSizePixel  = 0
+LogsContainer2.ZIndex           = 2
+
+local LogsCorner2 = Instance.new("UICorner")
+LogsCorner2.CornerRadius = UDim.new(0, 8)
+LogsCorner2.Parent = LogsContainer2
+
+local LogsStroke2 = Instance.new("UIStroke")
+LogsStroke2.Color     = COLORS.Stroke
+LogsStroke2.Thickness = 1
+LogsStroke2.Parent    = LogsContainer2
+
+LogsScroll2 = Instance.new("ScrollingFrame")
+LogsScroll2.Name                   = "LogsScroll2"
+LogsScroll2.Parent                 = LogsContainer2
+LogsScroll2.BackgroundTransparency = 1
+LogsScroll2.Position               = UDim2.new(0, 0, 0, 0)
+LogsScroll2.Size                   = UDim2.new(1, 0, 1, 0)
+LogsScroll2.CanvasSize             = UDim2.new(0, 0, 0, 0)
+LogsScroll2.AutomaticCanvasSize    = Enum.AutomaticSize.Y
+LogsScroll2.ScrollBarThickness     = 2
+LogsScroll2.ScrollBarImageColor3   = COLORS.CyanAccent
+LogsScroll2.BorderSizePixel        = 0
+LogsScroll2.ZIndex                 = 3
+
+local LogsScrollPadding = Instance.new("UIPadding")
+LogsScrollPadding.PaddingLeft   = UDim.new(0, 6)
+LogsScrollPadding.PaddingRight  = UDim.new(0, 6)
+LogsScrollPadding.PaddingTop    = UDim.new(0, 6)
+LogsScrollPadding.PaddingBottom = UDim.new(0, 6)
+LogsScrollPadding.Parent        = LogsScroll2
+
+local LogsListLayout2 = Instance.new("UIListLayout")
+LogsListLayout2.Parent               = LogsScroll2
+LogsListLayout2.SortOrder            = Enum.SortOrder.LayoutOrder
+LogsListLayout2.Padding              = UDim.new(0, 5)
+LogsListLayout2.HorizontalAlignment  = Enum.HorizontalAlignment.Center
+
+-- ===== GLOBALES SPAM SYSTEM =====
+local globalSpam = {
+    active    = false,
+    thread    = nil,
+    spamBtnRef = nil,
+    animalName = "",
+}
+autoSpamTasks = {}
+
+local function StartAutoSpam(animalName, msValue, retryCount)
+    if retryCount < 1 then retryCount = 1 end
+    local taskId      = animalName .. "_" .. tostring(os.clock())
+    local consoleLabel = AddConsoleEntry(animalName, msValue, 1, retryCount)
+    local thread
+    thread = task.spawn(function()
+        autoSpamTasks[taskId] = thread
+        for i = 1, retryCount do
+            if autoSpamTasks[taskId] == nil then break end
+            if consoleLabel and consoleLabel.Parent then
+                consoleLabel.Text = "[" .. os.date("%H:%M") .. "] [" .. i .. "/" .. retryCount .. "] " .. animalName .. " $" .. msValue .. "M/s"
+            end
+            task.wait(1.5)
+        end
+        autoSpamTasks[taskId] = nil
+    end)
+end
+
+StopCurrentSpam = function()
+    if globalSpam.active then
+        globalSpam.active = false
+        if globalSpam.thread then
+            task.cancel(globalSpam.thread)
+            globalSpam.thread = nil
+        end
+        if globalSpam.spamBtnRef and globalSpam.spamBtnRef.Parent then
+            globalSpam.spamBtnRef.Text = "Spam"
+        end
+        globalSpam.spamBtnRef  = nil
+        globalSpam.animalName  = ""
+    end
+end
+
+local function TriggerSpam(animalName, msValue, retryCount, spamBtnRef, jobId)
+    StopCurrentSpam()
+    globalSpam.active    = true
+    globalSpam.animalName = animalName
+    globalSpam.spamBtnRef = spamBtnRef
+    if spamBtnRef then spamBtnRef.Text = "Stop" end
+
+    local consoleLabel = AddConsoleEntry(animalName, msValue, 1, retryCount)
+
+    globalSpam.thread = task.spawn(function()
+        for i = 1, retryCount do
+            if not globalSpam.active or globalSpam.animalName ~= animalName then break end
+            if consoleLabel and consoleLabel.Parent then
+                local timeStr = os.date("%H:%M")
+                consoleLabel.Text = "[" .. timeStr .. "] [" .. i .. "/" .. retryCount .. "] " .. animalName .. " $" .. msValue .. "M/s"
+            end
+            if jobId and jobId ~= "" then
+                pcall(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, player)
+                end)
+            end
+            task.wait(1.5)
+        end
+        if globalSpam.active and globalSpam.animalName == animalName then
+            StopCurrentSpam()
+        end
+    end)
+end
+
+-- ===== NOTIFICATION SYSTEM =====
+
+local NotifContainer = Instance.new("Frame")
+NotifContainer.Name                   = "NotifContainer"
+NotifContainer.Parent                 = ScreenGui
+NotifContainer.BackgroundTransparency = 1
+NotifContainer.Position               = UDim2.new(0.5, -150, 0, 20)
+NotifContainer.Size                   = UDim2.new(0, 300, 0, 450)
+NotifContainer.ZIndex                 = 100
+NotifContainer.ClipsDescendants       = false
+
+local activeNotifs = {}
+local NOTIF_H    = 52
+local NOTIF_GAP  = 8
+local NOTIF_SLOT = NOTIF_H + NOTIF_GAP
+local NOTIF_W    = 300
+
+joinFrame = nil
+
+local function getTargetY(index)
+    return (index - 1) * NOTIF_SLOT
+end
+
+local function repositionAll()
+    for i, notif in ipairs(activeNotifs) do
+        TweenService:Create(notif, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0, 0, 0, getTargetY(i))
+        }):Play()
+    end
+end
+
+local function removeNotif(notif)
+    for i, n in ipairs(activeNotifs) do
+        if n == notif then table.remove(activeNotifs, i) break end
+    end
+    notif:Destroy()
+    repositionAll()
+end
+
+local function destroyJoinFrame()
+    if joinFrame and joinFrame.Parent then joinFrame:Destroy() end
+    joinFrame = nil
+end
+
+local function startJoinMode(animalName, msValue, jobId)
+    destroyJoinFrame()
+    StopCurrentSpam()
+
+    local JF = Instance.new("Frame")
+    JF.Name            = "JoinFrame"
+    JF.Parent          = ScreenGui
+    JF.BackgroundColor3 = COLORS.HeaderBG
+    JF.Size            = UDim2.new(0, 220, 0, 44)
+    JF.Position        = UDim2.new(1, 10, 1, -(44 + 16))
+    JF.BorderSizePixel = 0
+    JF.ZIndex          = 200
+    joinFrame = JF
+
+    Instance.new("UICorner", JF).CornerRadius = UDim.new(0, 8)
+
+    local JFStroke = Instance.new("UIStroke")
+    JFStroke.Color             = COLORS.CyanAccent
+    JFStroke.Thickness         = 1
+    JFStroke.ApplyStrokeMode   = Enum.ApplyStrokeMode.Border
+    JFStroke.Parent            = JF
+
+    local JFAccent = Instance.new("Frame")
+    JFAccent.Parent            = JF
+    JFAccent.BackgroundColor3  = COLORS.CyanAccent
+    JFAccent.BorderSizePixel   = 0
+    JFAccent.Position          = UDim2.new(0, 6, 0, 6)
+    JFAccent.Size              = UDim2.new(0, 3, 1, -12)
+    JFAccent.ZIndex            = 201
+    Instance.new("UICorner", JFAccent).CornerRadius = UDim.new(0, 6)
+
+    local JFName = Instance.new("TextLabel")
+    JFName.Parent               = JF
+    JFName.BackgroundTransparency = 1
+    JFName.Position             = UDim2.new(0, 16, 0, 7)
+    JFName.Size                 = UDim2.new(1, -70, 0, 14)
+    JFName.Font                 = Enum.Font.GothamBold
+    JFName.Text                 = animalName
+    JFName.TextColor3           = COLORS.TextWhite
+    JFName.TextSize             = 11
+    JFName.TextXAlignment       = Enum.TextXAlignment.Left
+    JFName.TextTruncate         = Enum.TextTruncate.AtEnd
+    JFName.ZIndex               = 202
+
+    local JFMS = Instance.new("TextLabel")
+    JFMS.Parent               = JF
+    JFMS.BackgroundTransparency = 1
+    JFMS.Position             = UDim2.new(0, 16, 0, 23)
+    JFMS.Size                 = UDim2.new(1, -70, 0, 13)
+    JFMS.Font                 = Enum.Font.GothamBold
+    JFMS.Text                 = "$" .. msValue .. "M/s"
+    JFMS.TextColor3           = COLORS.TextGray
+    JFMS.TextSize             = 10
+    JFMS.TextXAlignment       = Enum.TextXAlignment.Left
+    JFMS.ZIndex               = 202
+
+    local JFCount = Instance.new("TextLabel")
+    JFCount.Parent               = JF
+    JFCount.BackgroundTransparency = 1
+    JFCount.Position             = UDim2.new(1, -60, 0, 4)
+    JFCount.Size                 = UDim2.new(0, 52, 0, 12)
+    JFCount.Font                 = Enum.Font.GothamBold
+    JFCount.Text                 = "1/50"
+    JFCount.TextColor3           = COLORS.CyanAccent
+    JFCount.TextSize             = 10
+    JFCount.TextXAlignment       = Enum.TextXAlignment.Right
+    JFCount.ZIndex               = 202
+
+    local XBtn = Instance.new("TextButton")
+    XBtn.Parent             = JF
+    XBtn.BackgroundColor3   = Color3.fromRGB(45, 45, 55)
+    XBtn.Position           = UDim2.new(1, -20, 1, -19)
+    XBtn.Size               = UDim2.new(0, 14, 0, 14)
+    XBtn.Font               = Enum.Font.GothamBold
+    XBtn.Text               = "X"
+    XBtn.TextColor3         = COLORS.TextGray
+    XBtn.TextSize           = 8
+    XBtn.AutoButtonColor    = false
+    XBtn.BorderSizePixel    = 0
+    XBtn.ZIndex             = 203
+    Instance.new("UICorner", XBtn).CornerRadius = UDim.new(0, 3)
+
+    TweenService:Create(JF, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = UDim2.new(1, -236, 1, -(44 + 16))
+    }):Play()
+
+    TriggerSpam(animalName, msValue, 50, nil, jobId)
+
+    local function slideOutAndDestroy()
+        if not JF.Parent then return end
+        TweenService:Create(JF, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Position = UDim2.new(1, 10, 1, -(44 + 16))
+        }):Play()
+        task.wait(0.25)
+        destroyJoinFrame()
+    end
+
+    task.spawn(function()
+        for i = 1, 50 do
+            if not JF.Parent then return end
+            JFCount.Text = i .. "/50"
+            task.wait(1.5)
+        end
+        slideOutAndDestroy()
+    end)
+
+    XBtn.MouseButton1Click:Connect(function()
+        StopCurrentSpam()
+        slideOutAndDestroy()
+    end)
+end
+
+local function CreateNotification(animalName, msValue, mutation, jobId)
+    mutation = mutation or "Normal"
+    jobId    = jobId or ""
+
+    if #activeNotifs >= 4 then
+        local oldest = activeNotifs[1]
+        table.remove(activeNotifs, 1)
+        local oldY = oldest.Position.Y.Offset
+        local so = TweenService:Create(oldest, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Position = UDim2.new(0, 0, 0, oldY - 28),
+            BackgroundTransparency = 1
+        })
+        so:Play()
+        so.Completed:Connect(function() oldest:Destroy() end)
+        for i, n in ipairs(activeNotifs) do
+            TweenService:Create(n, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0, 0, 0, getTargetY(i))
+            }):Play()
+        end
+    end
+
+    local targetIndex = #activeNotifs + 1
+    local targetY     = getTargetY(targetIndex)
+
+    local Notif = Instance.new("Frame")
+    Notif.Name             = "Notification"
+    Notif.Parent           = NotifContainer
+    Notif.BackgroundColor3 = COLORS.HeaderBG
+    Notif.Size             = UDim2.new(0, NOTIF_W, 0, NOTIF_H)
+    Notif.BorderSizePixel  = 0
+    Notif.ZIndex           = 101
+    Notif.Position         = UDim2.new(0, 0, 0, targetY - 28)
+    table.insert(activeNotifs, Notif)
+
+    PlayAlertSound()
+
+    Instance.new("UICorner", Notif).CornerRadius = UDim.new(0, 8)
+
+    local NotifStroke = Instance.new("UIStroke")
+    NotifStroke.Color           = COLORS.CyanAccent
+    NotifStroke.Thickness       = 1
+    NotifStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    NotifStroke.Parent          = Notif
+
+    local Accent = Instance.new("Frame")
+    Accent.Parent           = Notif
+    Accent.BackgroundColor3 = COLORS.CyanAccent
+    Accent.BorderSizePixel  = 0
+    Accent.Position         = UDim2.new(0, 6, 0, 7)
+    Accent.Size             = UDim2.new(0, 3, 1, -13)
+    Accent.ZIndex           = 102
+    Instance.new("UICorner", Accent).CornerRadius = UDim.new(0, 6)
+
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Parent               = Notif
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.Position             = UDim2.new(0, 18, 0, 10)
+    NameLabel.Size                 = UDim2.new(1, -55, 0, 18)
+    NameLabel.Font                 = Enum.Font.GothamBold
+    NameLabel.Text                 = animalName
+    NameLabel.TextColor3           = COLORS.TextWhite
+    NameLabel.TextSize             = 14
+    NameLabel.TextXAlignment       = Enum.TextXAlignment.Left
+    NameLabel.TextTruncate         = Enum.TextTruncate.AtEnd
+    NameLabel.ZIndex               = 102
+
+    local MSLabel = Instance.new("TextLabel")
+    MSLabel.Parent               = Notif
+    MSLabel.BackgroundTransparency = 1
+    MSLabel.Position             = UDim2.new(0, 18, 0, 30)
+    MSLabel.Size                 = UDim2.new(1, -55, 0, 14)
+    MSLabel.Font                 = Enum.Font.GothamBold
+    MSLabel.Text                 = "$" .. msValue .. "M/s | " .. mutation
+    MSLabel.TextColor3           = COLORS.TextGray
+    MSLabel.TextSize             = 11
+    MSLabel.TextXAlignment       = Enum.TextXAlignment.Left
+    MSLabel.ZIndex               = 102
+
+    local CooldownLabel = Instance.new("TextLabel")
+    CooldownLabel.Parent               = Notif
+    CooldownLabel.BackgroundTransparency = 1
+    CooldownLabel.Position             = UDim2.new(1, -36, 0, 4)
+    CooldownLabel.Size                 = UDim2.new(0, 28, 0, 12)
+    CooldownLabel.Font                 = Enum.Font.GothamBold
+    CooldownLabel.Text                 = "8s"
+    CooldownLabel.TextColor3           = COLORS.TextGray
+    CooldownLabel.TextSize             = 11
+    CooldownLabel.TextXAlignment       = Enum.TextXAlignment.Right
+    CooldownLabel.ZIndex               = 102
+
+    local ClickArea = Instance.new("TextButton")
+    ClickArea.Parent               = Notif
+    ClickArea.BackgroundTransparency = 1
+    ClickArea.Position             = UDim2.new(0, 0, 0, 0)
+    ClickArea.Size                 = UDim2.new(1, 0, 1, 0)
+    ClickArea.Text                 = ""
+    ClickArea.AutoButtonColor      = false
+    ClickArea.ZIndex               = 103
+
+    local clicked = false
+    ClickArea.MouseButton1Click:Connect(function()
+        if clicked then return end
+        clicked = true
+        removeNotif(Notif)
+        startJoinMode(animalName, msValue, jobId)
+    end)
+
+    TweenService:Create(Notif, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0, 0, 0, targetY)
+    }):Play()
+
+    task.spawn(function()
+        for i = 8, 1, -1 do
+            if not Notif.Parent or clicked then return end
+            CooldownLabel.Text = i .. "s"
+            task.wait(1)
+        end
+        if Notif.Parent and not clicked then removeNotif(Notif) end
+    end)
+end
+
+-- DYNAMISCHE LOG-FUNKTION
+_G.AddNotifierLog = function(animalName, msValue, mutation, jobId)
+    mutation = mutation or "Normal"
+    jobId    = jobId or ""
+    local msNum = tonumber(msValue) or 0
+
+    local cfg = animalConfigs[animalName]
+    if not cfg or cfg.enabled ~= true then return end
+
+    local mutationOverride = mutation ~= "Normal" and cfg.mutations and cfg.mutations[mutation] == true
+    if not mutationOverride and msNum < (cfg.minMS or 0) then return end
+
+    local InfoRow = Instance.new("Frame")
+    InfoRow.Name             = "LogEntry"
+    InfoRow.Parent           = LogsScroll2
+    InfoRow.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    InfoRow.Size             = UDim2.new(1, 0, 0, 30)
+    InfoRow.BorderSizePixel  = 0
+    InfoRow.ZIndex           = 4
+
+    local InfoCorner = Instance.new("UICorner")
+    InfoCorner.CornerRadius = UDim.new(0, 6)
+    InfoCorner.Parent = InfoRow
+
+    local InfoStroke = Instance.new("UIStroke")
+    InfoStroke.Color     = COLORS.Stroke
+    InfoStroke.Thickness = 1
+    InfoStroke.Parent    = InfoRow
+
+    local InfoLabel = Instance.new("TextLabel")
+    InfoLabel.Parent               = InfoRow
+    InfoLabel.BackgroundTransparency = 1
+    InfoLabel.Position             = UDim2.new(0, 8, 0, 0)
+    InfoLabel.Size                 = UDim2.new(0.65, 0, 1, 0)
+    InfoLabel.Font                 = Enum.Font.GothamBold
+    InfoLabel.Text                 = animalName .. " - $" .. msValue .. "M/s | " .. mutation
+    InfoLabel.TextColor3           = COLORS.TextWhite
+    InfoLabel.TextSize             = 9
+    InfoLabel.TextXAlignment       = Enum.TextXAlignment.Left
+    InfoLabel.ZIndex               = 5
+
+    local ButtonContainer = Instance.new("Frame")
+    ButtonContainer.Parent               = InfoRow
+    ButtonContainer.BackgroundTransparency = 1
+    ButtonContainer.Position             = UDim2.new(0.65, 0, 0, 0)
+    ButtonContainer.Size                 = UDim2.new(0.35, -5, 1, 0)
+    ButtonContainer.ZIndex               = 5
+
+    local ButtonLayout = Instance.new("UIListLayout")
+    ButtonLayout.Parent               = ButtonContainer
+    ButtonLayout.FillDirection        = Enum.FillDirection.Horizontal
+    ButtonLayout.HorizontalAlignment  = Enum.HorizontalAlignment.Right
+    ButtonLayout.VerticalAlignment    = Enum.VerticalAlignment.Center
+    ButtonLayout.Padding              = UDim.new(0, 4)
+
+    local function CreateSmallBtn(text, parent)
+        local Btn = Instance.new("TextButton")
+        Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        Btn.Size             = UDim2.new(0, 32, 0, 18)
+        Btn.Font             = Enum.Font.GothamBold
+        Btn.Text             = text
+        Btn.TextColor3       = COLORS.TextWhite
+        Btn.TextSize         = 8
+        Btn.BorderSizePixel  = 0
+        Btn.ZIndex           = 6
+        Btn.Parent           = parent
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 4)
+        Corner.Parent = Btn
+        local Stroke = Instance.new("UIStroke")
+        Stroke.Color = COLORS.Stroke; Stroke.Thickness = 1; Stroke.Parent = Btn
+        return Btn
+    end
+
+    local SpamBtn = CreateSmallBtn("Spam", ButtonContainer)
+    local JoinBtn = CreateSmallBtn("Join", ButtonContainer)
+    LogsScroll2.CanvasPosition = Vector2.new(0, 9999)
+
+    JoinBtn.MouseButton1Click:Connect(function()
+        AddConsoleEntry(animalName, msValue, 1, 1)
+        TryTeleport(jobId, 1)
+    end)
+
+    SpamBtn.MouseButton1Click:Connect(function()
+        if globalSpam.active and globalSpam.animalName == animalName then
+            StopCurrentSpam()
+        else
+            local retryCount = animalRetryConfigs[animalName] or 1
+            TriggerSpam(animalName, msValue, retryCount, SpamBtn, jobId)
+        end
+    end)
+
+    if autoJoinEnabled and not (joinFrame and joinFrame.Parent) then
+        local retryCount = math.max(1, animalRetryConfigs[animalName] or 1)
+        TriggerSpam(animalName, msValue, retryCount, SpamBtn, jobId)
+    end
+
+    CreateNotification(animalName, msValue, mutation, jobId)
+end
+
+-- SERVER BATCH LOG
+_G.AddServerLog = function(animals)
+    if not animals or #animals == 0 then return end
+
+    local filtered = {}
+    for _, entry in ipairs(animals) do
+        local aName  = entry.name  or entry[1]
+        local msVal  = tostring(entry.ms   or entry[2] or "0")
+        local mut    = entry.mut   or entry[3] or entry.mutation or "Normal"
+        local jId    = entry.jobId or entry[4] or ""
+        local msNum  = tonumber(msVal) or 0
+        local cfg    = animalConfigs[aName]
+        if cfg and cfg.enabled == true then
+            local mutOverride = mut ~= "Normal" and cfg.mutations and cfg.mutations[mut] == true
+            if mutOverride or msNum >= (cfg.minMS or 0) then
+                table.insert(filtered, {name=aName, ms=msVal, msNum=msNum, mut=mut, jobId=jId})
+            end
+        end
+    end
+
+    if #filtered == 0 then return end
+
+    table.sort(filtered, function(a, b) return a.msNum > b.msNum end)
+
+    local best = filtered[1]
+    CreateNotification(best.name, best.ms, best.mut, best.jobId)
+
+    local restCount = #filtered - 1
+    local totalH    = 30 + (restCount > 0 and (10 + restCount * 22) or 0)
+
+    local ServerRow = Instance.new("Frame")
+    ServerRow.Name             = "ServerEntry"
+    ServerRow.Parent           = LogsScroll2
+    ServerRow.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    ServerRow.Size             = UDim2.new(1, 0, 0, totalH)
+    ServerRow.BorderSizePixel  = 0
+    ServerRow.ZIndex           = 4
+    Instance.new("UICorner", ServerRow).CornerRadius = UDim.new(0, 6)
+    local SR_Stroke = Instance.new("UIStroke")
+    SR_Stroke.Color = COLORS.Stroke; SR_Stroke.Thickness = 1; SR_Stroke.Parent = ServerRow
+
+    local BestLabel = Instance.new("TextLabel")
+    BestLabel.Parent               = ServerRow
+    BestLabel.BackgroundTransparency = 1
+    BestLabel.Position             = UDim2.new(0, 8, 0, 0)
+    BestLabel.Size                 = UDim2.new(0.65, 0, 0, 30)
+    BestLabel.Font                 = Enum.Font.GothamBold
+    BestLabel.Text                 = best.name .. " - $" .. best.ms .. "M/s | " .. best.mut
+    BestLabel.TextColor3           = COLORS.TextWhite
+    BestLabel.TextSize             = 9
+    BestLabel.TextXAlignment       = Enum.TextXAlignment.Left
+    BestLabel.ZIndex               = 5
+
+    local BestBtnContainer = Instance.new("Frame")
+    BestBtnContainer.Parent               = ServerRow
+    BestBtnContainer.BackgroundTransparency = 1
+    BestBtnContainer.Position             = UDim2.new(0.65, 0, 0, 0)
+    BestBtnContainer.Size                 = UDim2.new(0.35, -5, 0, 30)
+    BestBtnContainer.ZIndex               = 5
+    local BLayout = Instance.new("UIListLayout")
+    BLayout.Parent               = BestBtnContainer
+    BLayout.FillDirection        = Enum.FillDirection.Horizontal
+    BLayout.HorizontalAlignment  = Enum.HorizontalAlignment.Right
+    BLayout.VerticalAlignment    = Enum.VerticalAlignment.Center
+    BLayout.Padding              = UDim.new(0, 4)
+
+    local function MakeSmallBtn(text, parent)
+        local Btn = Instance.new("TextButton")
+        Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        Btn.Size             = UDim2.new(0, 32, 0, 18)
+        Btn.Font             = Enum.Font.GothamBold
+        Btn.Text             = text; Btn.TextColor3 = COLORS.TextWhite; Btn.TextSize = 8
+        Btn.AutoButtonColor  = false; Btn.BorderSizePixel = 0; Btn.ZIndex = 6
+        Btn.Parent           = parent
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+        local S = Instance.new("UIStroke"); S.Color = COLORS.Stroke; S.Thickness = 1; S.Parent = Btn
+        return Btn
+    end
+
+    local BSpam = MakeSmallBtn("Spam", BestBtnContainer)
+    local BJoin = MakeSmallBtn("Join", BestBtnContainer)
+    BJoin.MouseButton1Click:Connect(function()
+        AddConsoleEntry(best.name, best.ms, 1, 1)
+        TryTeleport(best.jobId, 1)
+    end)
+    BSpam.MouseButton1Click:Connect(function()
+        if globalSpam.active and globalSpam.animalName == best.name then
+            StopCurrentSpam()
+        else
+            TriggerSpam(best.name, best.ms, animalRetryConfigs[best.name] or 1, BSpam, best.jobId)
+        end
+    end)
+
+    if restCount > 0 then
+        local Divider = Instance.new("Frame")
+        Divider.Parent           = ServerRow
+        Divider.BackgroundColor3 = COLORS.Stroke
+        Divider.BorderSizePixel  = 0
+        Divider.Position         = UDim2.new(0, 6, 0, 32)
+        Divider.Size             = UDim2.new(1, -12, 0, 1)
+        Divider.ZIndex           = 5
+
+        for i = 2, #filtered do
+            local entry = filtered[i]
+            local yPos  = 33 + (i - 2) * 22
+            local SubLabel = Instance.new("TextLabel")
+            SubLabel.Parent               = ServerRow
+            SubLabel.BackgroundTransparency = 1
+            SubLabel.Position             = UDim2.new(0, 8, 0, yPos)
+            SubLabel.Size                 = UDim2.new(1, -16, 0, 20)
+            SubLabel.Font                 = Enum.Font.Gotham
+            SubLabel.Text                 = entry.name .. " - $" .. entry.ms .. "M/s | " .. entry.mut
+            SubLabel.TextColor3           = COLORS.TextGray
+            SubLabel.TextSize             = 8
+            SubLabel.TextXAlignment       = Enum.TextXAlignment.Left
+            SubLabel.ZIndex               = 5
+        end
+    end
+
+    LogsScroll2.CanvasPosition = Vector2.new(0, 9999)
+
+    if autoJoinEnabled and not (joinFrame and joinFrame.Parent) then
+        for _, entry in ipairs(filtered) do
+            local retryCount = math.max(1, animalRetryConfigs[entry.name] or 1)
+            TriggerSpam(entry.name, entry.ms, retryCount, nil, entry.jobId)
+        end
+    end
+end
+
+-- ===== SIDEBAR BUTTONS & TAB SWITCHING =====
+local currentTab = "home"
+local function CreateSidebarBtn(iconId, pos, name)
+    local Btn = Instance.new("TextButton")
+    Btn.Name             = name
+    Btn.Parent           = LeftContainer
+    Btn.BackgroundColor3 = COLORS.ButtonBG
+    Btn.Position         = pos
+    Btn.Size             = UDim2.new(0, 40, 0, 40)
+    Btn.Text             = ""
+    Btn.ZIndex           = 5
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Btn
+    local Icon = Instance.new("ImageLabel")
+    Icon.Parent               = Btn
+    Icon.BackgroundTransparency = 1
+    Icon.Size                 = UDim2.new(0, 20, 0, 20)
+    Icon.Position             = UDim2.new(0.5, -10, 0.5, -10)
+    Icon.Image                = "rbxthumb://type=Asset&id=" .. iconId .. "&w=420&h=420"
+    Icon.ImageColor3          = COLORS.TextWhite
+    Icon.ZIndex               = 10
+    return Btn, Icon
+end
+
+local HomeTabBtn,     HomeIcon     = CreateSidebarBtn("128410874493884", UDim2.new(0, 5, 0, 5),  "HomeBtn")
+local SettingsTabBtn, SettingsIcon = CreateSidebarBtn("120283509308933", UDim2.new(0, 5, 0, 50), "SettingsBtn")
+local ExtraTabBtn,    ExtraIcon    = CreateSidebarBtn("87783973719985",  UDim2.new(0, 5, 0, 95), "ExtraBtn")
+
+local function UpdateTabUI()
+    HomeIcon.ImageColor3     = (currentTab == "home")     and COLORS.TabActive or COLORS.TabInactive
+    SettingsIcon.ImageColor3 = (currentTab == "settings") and COLORS.TabActive or COLORS.TabInactive
+    ExtraIcon.ImageColor3    = (currentTab == "extra")    and COLORS.TabActive or COLORS.TabInactive
+    HomeContent.Visible     = (currentTab == "home")
+    SettingsContent.Visible = (currentTab == "settings")
+    ExtraContent.Visible    = (currentTab == "extra")
+end
+
+HomeTabBtn.MouseButton1Click:Connect(function()    currentTab = "home";     UpdateTabUI() end)
+SettingsTabBtn.MouseButton1Click:Connect(function() currentTab = "settings"; UpdateTabUI() end)
+ExtraTabBtn.MouseButton1Click:Connect(function()   currentTab = "extra";    UpdateTabUI() end)
+
+UpdateTabUI()
+
+-- MANUAL JOIN BUTTON
+JoinServerBtn.MouseButton1Click:Connect(function()
+    local id = JobIdInput.Text
+    if not id or id == "" then return end
+    id = id:gsub("%s+", "")
+    local decId = decryptJobId(id)
+    AddConsoleEntry("ManualJoin", "?", 1, 1)
+    TryTeleport(decId, 1)
+end)
+
+-- STATUS DOT UPDATER
+local function SetStatus(state)
+    ws_status = state
+    UpdateWsStatusBar(state)
+    if state == "CONNECTED" then
+        StatusDot.BackgroundColor3 = Color3.fromRGB(0, 220, 100)
+        TitleLabel.Text = "CYNS NOTIFIER  ●  LIVE"
+    elseif state == "CONNECTING" then
+        StatusDot.BackgroundColor3 = Color3.fromRGB(255, 180, 0)
+        TitleLabel.Text = "CYNS NOTIFIER  ●  CONNECTING..."
+    else
+        StatusDot.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        TitleLabel.Text = "CYNS NOTIFIER  ●  OFFLINE"
+    end
+end
+
+-- WEBSOCKET CONNECT
+
+local function processMessage(data)
+    if data.type == "new_server" then
+        local rawJobId = tostring(data.jobid or "")
+        local jobId    = (rawJobId ~= "") and decryptJobId(rawJobId) or ""
+        local name     = tostring(data.name     or "Unknown")
+        local ms       = tostring(data.ms       or data.money or "0")
+        local mutation = tostring(data.mutation or data.mut   or "Normal")
+        if jobId ~= "" and logged_ids[jobId] then return end
+        if jobId ~= "" then logged_ids[jobId] = true end
+        _G.AddNotifierLog(name, ms, mutation, jobId)
+
+    elseif data.type == "batch" and data.animals then
+        local batch = {}
+        for _, entry in ipairs(data.animals) do
+            local rawJobId = tostring(entry.jobid or entry.jobId or "")
+            local jobId    = (rawJobId ~= "") and decryptJobId(rawJobId) or ""
+            if jobId == "" or not logged_ids[jobId] then
+                if jobId ~= "" then logged_ids[jobId] = true end
+                table.insert(batch, {
+                    name  = tostring(entry.name     or "Unknown"),
+                    ms    = tostring(entry.ms       or "0"),
+                    mut   = tostring(entry.mutation or entry.mut or "Normal"),
+                    jobId = jobId,
+                })
+            end
+        end
+        if #batch > 0 then _G.AddServerLog(batch) end
+    end
+end
+
+local function Connect()
+    if is_connecting then return end
+    is_connecting = true
+    SetStatus("CONNECTING")
+
+    local ws = nil
+    local success, result = pcall(function() return WebSocket.connect(WS_URL) end)
+
+    if success and result then
+        ws = result
+        active_ws = ws
+        SetStatus("CONNECTED")
+        AddConsoleEntry("websocket", "ok", "connected", "live")
+
+        ws.OnMessage:Connect(function(msg)
+            local ok, data = pcall(function() return HttpService:JSONDecode(msg) end)
+            if ok and data then processMessage(data) end
+        end)
+
+        ws.OnClose:Connect(function()
+            active_ws = nil
+            SetStatus("OFFLINE")
+            AddConsoleEntry("websocket", "0", "closed", "retry")
+        end)
+    else
+        active_ws = nil
+        SetStatus("OFFLINE")
+        AddConsoleEntry("websocket", "0", "failed", "err")
+    end
+
+    is_connecting = false
+end
+
+-- AUTO RECONNECT + HEARTBEAT
+task.spawn(function()
+    while true do
+        if not active_ws then
+            Connect()
+        else
+            local ok = pcall(function() active_ws:Send("ping") end)
+            if not ok then
+                active_ws = nil
+                SetStatus("OFFLINE")
+            end
+        end
+        task.wait(1.5)
+    end
+end)
+
+print("CYNS AutoJoiner geladen — Config: " .. FileName)
