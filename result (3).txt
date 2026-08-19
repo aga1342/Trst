@@ -1,0 +1,1646 @@
+-- Deobfuscated By Dex Notifier [.gg/dexfinder]
+
+local fenv = getfenv()
+local _ENV2 = fenv._ENV
+local _4 = ((_ENV2 or _G) or {})
+local _setmetatable5 = _4.setmetatable
+local _ = _setmetatable5 ~= nil
+local _8 = ((_ENV2 or _G) or {})
+local _rawget9 = _8.rawget
+local _ = _rawget9 ~= nil
+local _call15 = _setmetatable5({}, {__index = fenv})
+local _17 = (_call15 or fenv)
+
+_17.rawget = rawget
+_17.bit32 = {
+    band = function(...) end,
+    extract = function(...) end,
+    byteswap = function(...) end,
+    bor = function(...) end,
+    bnot = function(...) end,
+    countrz = function(...) end,
+    bxor = function(...) end,
+    arshift = function(...) end,
+    rshift = function(...) end,
+    rrotate = function(...) end,
+    replace = function(...) end,
+    lshift = function(...) end,
+    lrotate = function(...) end,
+    btest = function(...) end,
+    countlz = function(...) end,
+}
+_17.table = {
+    getn = function(...) end,
+    foreachi = function(...) end,
+    foreach = function(...) end,
+    sort = function(...) end,
+    unpack = function(...) end,
+    freeze = function(...) end,
+    clear = function(...) end,
+    pack = function(...) end,
+    move = function(...) end,
+    insert = function(...) end,
+    create = function(...) end,
+    maxn = function(...) end,
+    isfrozen = function(...) end,
+    concat = function(...) end,
+    remove = function(...) end,
+    find = function(...) end,
+    clone = function(...) end,
+}
+_17.setmetatable = setmetatable
+_17.debug = {
+    getupvalue = debug.getupvalue,
+    sethook = debug.sethook,
+    getupvalues = debug.getupvalues,
+    getmetatable = debug.getmetatable,
+    setmetatable = debug.setmetatable,
+    traceback = function(...) end,
+    info = function(...) end,
+    setlocal = debug.setlocal,
+    setupvalue = debug.setupvalue,
+    getinfo = function(...) end,
+    getregistry = debug.getregistry,
+    getlocal = debug.getlocal,
+}
+
+local _ = restorefunction ~= nil
+local _ = restorefunction ~= nil
+
+_17.restorefunction = restorefunction
+_17.assert = function(...) end
+_17.xpcall = function(...) end
+_17.error = function(...) end
+_17.writefile = writefile
+_17.type = type
+_17.pairs = pairs
+_17.pcall = pcall
+
+local _ = _ENV2 ~= nil
+local _ = _ENV2 ~= nil
+
+_17._ENV = _ENV2
+_17.tonumber = function(...) end
+_17.typeof = type
+_17.os = {
+    difftime = function(...) end,
+    date = function(...) end,
+    time = function(...) end,
+    clock = function(...) end,
+}
+_17.appendfile = appendfile
+_17.getmetatable = getmetatable
+_17.rawlen = function(...) end
+
+local _ = print ~= nil
+local _ = print ~= nil
+
+_17.print = print
+_17.getgenv = getgenv
+_17.rawset = rawset
+_17.setfenv = setfenv
+_17.tostring = tostring
+_17.ipairs = ipairs
+
+local _ = getgc ~= nil
+local _ = getgc ~= nil
+
+_17.getgc = getgc
+
+local _ = task ~= nil
+local _ = task ~= nil
+
+_17.task = task
+_17.unpack = unpack
+_17.rawequal = function(...) end
+_17.next = next
+_17.coroutine = {
+    running = function(...) end,
+    resume = function(...) end,
+    yield = function(...) end,
+    close = function(...) end,
+    status = function(...) end,
+    wrap = function(...) end,
+    create = function(...) end,
+    isyieldable = function(...) end,
+}
+_17.getfenv = getfenv
+_17.select = function(...) end
+_17.math = {
+    log = function(...) end,
+    ldexp = function(...) end,
+    rad = function(...) end,
+    cosh = function(...) end,
+    round = function(...) end,
+    random = function(...) end,
+    clamp = function(...) end,
+    pi = 3.141592653589793,
+    floor = function(...) end,
+    max = function(...) end,
+    sqrt = function(...) end,
+    modf = function(...) end,
+    huge = 1 / 0,
+    pow = function(...) end,
+    acos = function(...) end,
+    tan = function(...) end,
+    cos = function(...) end,
+    exp = function(...) end,
+    tanh = function(...) end,
+    log10 = function(...) end,
+    ceil = function(...) end,
+    atan2 = function(...) end,
+    abs = function(...) end,
+    atan = function(...) end,
+    sinh = function(...) end,
+    asin = function(...) end,
+    min = function(...) end,
+    randomseed = function(...) end,
+    fmod = function(...) end,
+    deg = function(...) end,
+    sign = function(...) end,
+    frexp = function(...) end,
+    sin = function(...) end,
+    noise = function(...) end,
+}
+_17.string = {
+    split = function(...) end,
+    match = function(...) end,
+    gmatch = function(...) end,
+    upper = function(...) end,
+    gsub = function(...) end,
+    format = function(...) end,
+    lower = function(...) end,
+    sub = function(...) end,
+    pack = function(...) end,
+    find = function(...) end,
+    char = function(...) end,
+    packsize = function(...) end,
+    reverse = function(...) end,
+    byte = function(...) end,
+    len = function(...) end,
+    rep = function(...) end,
+    unpack = function(...) end,
+}
+
+local _ = _G == nil
+local _ = fenv ~= _G
+local _ = game ~= nil
+local _ = Instance ~= nil
+local _Instancenew32 = Instance.new
+local _34 = (_Instancenew32 or nil)
+local _ = _34 ~= nil
+
+type(_34)
+
+fenv.NL = 1
+fenv.NY = '[string "./httplog2"]:1410: invalid argument #1 to \'rawget\' (table expected, got nil)'
+fenv.Ns = 'v778pf'
+fenv.N0 = nil
+
+local _ = fenv.N0 == nil
+
+fenv.bi = '[string "./httplog2"]:1045\n[string "DontDtcTsPls"]:1\n[string "DontDtcTsPls"]:1\n[string "./httplog2"]:1614\n[string "./httplog2"]:1640\n'
+fenv.bN = true
+fenv.bb = 6
+
+local _coroutine38 = _ENV2.coroutine
+local _40 = (_coroutine38 or nil)
+local _create41 = _40.create
+local _43 = (_create41 or nil)
+local _resume44 = _40.resume
+local _46 = (_resume44 or nil)
+
+CHECKIF(_46)
+
+local _call48 = _43(function(...) end)
+
+_46(_call48)
+type(genv)
+
+local _WYNF_NO_VIRTUALIZE50 = fenv.WYNF_NO_VIRTUALIZE
+local _ = _WYNF_NO_VIRTUALIZE50 ~= nil
+local _52 = (_WYNF_NO_VIRTUALIZE50 or function(...) end)
+local _ = _52 == _52
+local _ = _52 == _52
+local _ = _WYNF_NO_VIRTUALIZE50 ~= nil
+local _56 = (_WYNF_NO_VIRTUALIZE50 or function(...) end)
+local _ = _56 == _56
+local _ = _56 == _56
+
+CHECKIF(_56)
+
+local _call61 = Vector3int16.new(1, 2, 3)
+local _ = Vector3int16.new and _call61
+
+CHECKIF(_call61)
+
+local _75 = (((86374782376856 + (((_call61.X * 31) + (_call61.Y * 17)) + (_call61.Z * 13))) + 81) % 2147483647)
+local _ = _75 == 0
+local _ = fenv['4887075165']
+local _ = fenv['7276511007']
+local _ = fenv['7276578672']
+local _ = fenv['4887045442']
+local _ = fenv['4887048204']
+local _ = fenv['4887018261']
+local _ = fenv['727656653']
+local _ = fenv['5122529990']
+local _ = fenv['5122546500']
+local _ = fenv['4887067406']
+local _ = fenv['5122598518']
+local _ = fenv['7276560761']
+local _ = fenv['4887014927']
+local _ = fenv['512252565']
+local _ = fenv['4887052892']
+local _ = fenv['7276577119']
+local _ = fenv['512253613']
+local _ = fenv['7276516950']
+local _ = fenv['7276526149']
+local _ = fenv['7276559514']
+local _ = fenv['4887042419']
+local _ = fenv['5122595674']
+local _ = fenv['7276577566']
+local _ = fenv['4887068363']
+local _ = fenv['4887075958']
+local _ = fenv['5122560738']
+local _ = fenv['4887033799']
+local _ = fenv['5122547404']
+local _ = fenv['5122591379']
+local _ = fenv['5122552641']
+local _ = fenv['5122585558']
+local _ = fenv['7276594969']
+local _ = fenv['4887086829']
+local _ = fenv['7276574443']
+local _ = fenv['4887080948']
+local _ = fenv['7276544306']
+local _ = fenv['7276576723']
+local _ = fenv['5122541086']
+local _ = fenv['7276527965']
+local _ = fenv['4887023254']
+local _ = fenv['5122573623']
+local _ = fenv['4887044171']
+local _ = fenv['4887075367']
+local _ = fenv['5122598242']
+local _ = fenv['488702334']
+local _ = fenv['5122549734']
+local _ = fenv['4887017123']
+local _ = fenv['5122591557']
+local _ = fenv['7276566768']
+local _ = fenv['5122532100']
+local _ = fenv['5122575787']
+local _ = fenv['4887058099']
+local _ = fenv['5122584945']
+local _ = fenv['4887056466']
+local _ = fenv['7276526246']
+local _ = fenv['7276589719']
+local _ = fenv['5122517228']
+local _ = fenv['72765246']
+local _ = fenv['4887075090']
+local _ = fenv['7276547034']
+local _ = fenv['7276581648']
+local _ = fenv['5122560894']
+local _ = fenv['5122578616']
+local _ = fenv['7276532249']
+local _ = fenv['7276570841']
+local _ = fenv['4887071012']
+local _ = fenv['4887088967']
+local _ = fenv['7276514778']
+local _ = fenv['4887057799']
+local _ = fenv['4887051344']
+local _ = fenv['7276520665']
+local _ = fenv['4887081817']
+local _ = fenv['5122580966']
+local _ = fenv['4887061791']
+local _ = fenv['4887046776']
+local _ = fenv['5122521082']
+local _ = fenv['5122555446']
+local _ = fenv['4887029626']
+local _ = fenv['727656649']
+local _ = fenv['4887082565']
+local _ = fenv['4887052281']
+local _ = fenv['4887080427']
+local _ = fenv['7276554912']
+local _ = fenv['7276521557']
+local _ = fenv['512255091']
+local _ = fenv['7276574220']
+local _ = fenv['4887045439']
+local _ = fenv['7276535541']
+local _ = fenv['5122560970']
+local _ = fenv['5122534847']
+local _ = fenv['7276599474']
+local _ = fenv['4887039515']
+local _ = fenv['4887059135']
+local _ = fenv['488703241']
+local _ = fenv['512253544']
+local _ = fenv['5122550496']
+local _ = fenv['5122527487']
+local _ = fenv['7276591050']
+local _ = fenv['7276579882']
+local _ = fenv['5122516333']
+local _ = fenv['7276568810']
+local _ = fenv['5122537492']
+local _ = fenv['4887042123']
+local _ = fenv['5122557179']
+local _ = fenv['4887033506']
+local _ = fenv['7276551920']
+local _ = fenv['4887094854']
+local _ = fenv['7276599946']
+local _ = fenv['5122529555']
+local _ = fenv['4887017049']
+local _ = fenv['7276594994']
+local _ = fenv['5122579424']
+local _ = fenv['4887073280']
+local _ = fenv['4887094902']
+local _ = fenv['5122551942']
+local _ = fenv['7276578201']
+local _ = fenv['7276541790']
+local _ = fenv['5122564840']
+local _ = fenv['7276583304']
+local _ = fenv['4887073356']
+local _ = fenv['5122545636']
+local _ = fenv['5122572361']
+local _ = fenv['7276561211']
+local _ = fenv['7276544156']
+local _ = fenv['5122561007']
+local _ = fenv['4887094028']
+local _ = fenv['7276534891']
+local _ = fenv['5122563147']
+local _ = fenv['7276540271']
+local _ = fenv['7276583736']
+local _ = fenv['4887068873']
+local _ = fenv['488702650']
+local _ = fenv['5122512411']
+local _ = fenv['488703983']
+local _ = fenv['4887061597']
+local _ = fenv['5122598468']
+local _ = fenv['512259916']
+local _ = fenv['5122535835']
+local _ = fenv['7276537465']
+local _ = fenv['5122547868']
+local _ = fenv['7276568442']
+local _ = fenv['5122521854']
+local _ = fenv['4887070741']
+local _ = fenv['5122548374']
+local _ = fenv['512258526']
+local _ = fenv['5122515514']
+local _ = fenv['5122544606']
+local _ = fenv['5122517328']
+local _ = fenv['7276527413']
+local _ = fenv['5122519350']
+local _ = fenv['4887016576']
+local _ = fenv['7276585863']
+local _ = fenv['4887067284']
+local _ = fenv['4887051894']
+local _ = fenv['5122598680']
+local _ = fenv['7276582064']
+local _ = fenv['5122587918']
+local _ = fenv['5122585744']
+local _ = fenv['4887047']
+local _ = fenv['7276566995']
+local _ = fenv['4887096342']
+local _ = fenv['4887044431']
+local _ = fenv['4887068398']
+local _ = fenv['7276578153']
+local _ = fenv['4887035267']
+local _ = fenv['7276564599']
+local _ = fenv['7276586358']
+local _ = fenv['512253012']
+local _ = fenv['7276512513']
+local _ = fenv['4887040590']
+local _ = fenv['7276536751']
+local _ = fenv['5122545224']
+local _ = fenv['7276587470']
+local _ = fenv['7276578055']
+local _ = fenv['512257808']
+local _ = fenv['7276539899']
+local _ = fenv['7276568894']
+local _ = fenv['4887054283']
+local _ = fenv['5122573826']
+local _ = fenv['4887091746']
+local _ = fenv['5122528021']
+local _ = fenv['5122550407']
+local _ = fenv['5122524496']
+local _ = fenv['5122570973']
+local _ = fenv['5122578380']
+local _ = fenv['4887037312']
+local _ = fenv['5122526522']
+local _ = fenv['7276597757']
+local _ = fenv['5122591835']
+local _ = fenv['4887099190']
+local _ = fenv['4887077142']
+local _ = fenv['7276576603']
+local _ = fenv['7276523948']
+local _ = fenv['5122597818']
+local _ = fenv['7276534334']
+local _ = fenv['5122561265']
+local _ = fenv['7276548071']
+local _ = fenv['7276520646']
+local _ = fenv['5122548894']
+local _ = fenv['4887025941']
+local _292 = (((((((((((((((2675706454 + (_75 or 0)) % 4294967296) + 47545) + 786) + 65272) + 24779) + 0) + 21417) % 4294967296) * 1664525) + 1013904223) + 7493055) + 66702) + 0) % 4294967296)
+local _ = _292 == 0
+local _301 = ((((((((_292 * 1664525) + 1013904223) + 47545) + 131) + 102) + 0) + 1831565813) % 4294967296)
+local _302 = (_301 % 256)
+local _ = ((_301 - (_301 % 65536)) / 65536) % 256
+local _ = ((_301 - (_301 % 16777216)) / 16777216) % 256
+local _315 = (((((_301 - _302) / 256) % 256) + 1) % 256)
+local _ = _302 > 0
+local _317 = (_302 % 2)
+local _318 = (_315 % 2)
+local _ = _317 ~= _318
+local _ = _317 == _318
+local _323 = ((_302 - _317) / 2)
+local _324 = ((_315 - _318) / 2)
+local _ = _323 > 0
+local _326 = (_323 % 2)
+local _327 = (_324 % 2)
+local _ = _326 ~= _327
+local _ = _326 == _327
+local _332 = ((_323 - _326) / 2)
+local _333 = ((_324 - _327) / 2)
+local _ = _332 > 0
+local _335 = (_332 % 2)
+local _336 = (_333 % 2)
+local _ = _335 ~= _336
+local _ = _335 == _336
+local _341 = ((_332 - _335) / 2)
+local _342 = ((_333 - _336) / 2)
+local _ = _341 > 0
+local _344 = (_341 % 2)
+local _345 = (_342 % 2)
+local _ = _344 ~= _345
+local _ = _344 == _345
+local _350 = ((_341 - _344) / 2)
+local _351 = ((_342 - _345) / 2)
+local _ = _350 > 0
+local _353 = (_350 % 2)
+local _354 = (_351 % 2)
+local _ = _353 ~= _354
+local _ = _353 == _354
+local _359 = ((_350 - _353) / 2)
+local _360 = ((_351 - _354) / 2)
+local _ = _359 > 0
+local _362 = (_359 % 2)
+local _363 = (_360 % 2)
+local _ = _362 ~= _363
+local _ = _362 == _363
+local _368 = ((_359 - _362) / 2)
+local _369 = ((_360 - _363) / 2)
+local _ = _368 > 0
+local _371 = (_368 % 2)
+local _372 = (_369 % 2)
+local _ = _371 ~= _372
+local _ = _371 == _372
+local _377 = ((_368 - _371) / 2)
+local _378 = ((_369 - _372) / 2)
+local _ = _377 > 0
+local _380 = (_377 % 2)
+local _381 = (_378 % 2)
+local _ = _380 ~= _381
+local _ = _380 == _381
+local _386 = ((_377 - _380) / 2)
+local _387 = ((_378 - _381) / 2)
+local _ = _386 > 0
+local _389 = (_386 % 2)
+local _390 = (_387 % 2)
+local _ = _389 ~= _390
+local _ = _389 == _390
+local _395 = ((_386 - _389) / 2)
+local _396 = ((_387 - _390) / 2)
+local _ = _395 > 0
+local _398 = (_395 % 2)
+local _399 = (_396 % 2)
+local _ = _398 ~= _399
+local _ = _398 == _399
+local _404 = ((_395 - _398) / 2)
+local _405 = ((_396 - _399) / 2)
+local _ = _404 > 0
+local _407 = (_404 % 2)
+local _408 = (_405 % 2)
+local _ = _407 ~= _408
+local _ = _407 == _408
+local _413 = ((_404 - _407) / 2)
+local _414 = ((_405 - _408) / 2)
+local _ = _413 > 0
+local _416 = (_413 % 2)
+local _417 = (_414 % 2)
+local _ = _416 ~= _417
+local _ = _416 == _417
+local _422 = ((_413 - _416) / 2)
+local _423 = ((_414 - _417) / 2)
+local _ = _422 > 0
+local _425 = (_422 % 2)
+local _426 = (_423 % 2)
+local _ = _425 ~= _426
+local _ = _425 == _426
+local _431 = ((_422 - _425) / 2)
+local _432 = ((_423 - _426) / 2)
+local _ = _431 > 0
+local _434 = (_431 % 2)
+local _435 = (_432 % 2)
+local _ = _434 ~= _435
+local _ = _434 == _435
+local _440 = ((_431 - _434) / 2)
+local _441 = ((_432 - _435) / 2)
+local _ = _440 > 0
+local _443 = (_440 % 2)
+local _444 = (_441 % 2)
+local _ = _443 ~= _444
+local _ = _443 == _444
+local _449 = ((_440 - _443) / 2)
+local _450 = ((_441 - _444) / 2)
+local _ = _449 > 0
+local _452 = (_449 % 2)
+local _453 = (_450 % 2)
+local _ = _452 ~= _453
+local _ = _452 == _453
+local _458 = ((_449 - _452) / 2)
+local _459 = ((_450 - _453) / 2)
+local _ = _458 > 0
+local _461 = (_458 % 2)
+local _462 = (_459 % 2)
+local _ = _461 ~= _462
+local _ = _461 == _462
+local _467 = ((_458 - _461) / 2)
+local _468 = ((_459 - _462) / 2)
+local _ = _467 > 0
+local _470 = (_467 % 2)
+local _471 = (_468 % 2)
+local _ = _470 ~= _471
+local _ = _470 == _471
+local _476 = ((_467 - _470) / 2)
+local _477 = ((_468 - _471) / 2)
+local _ = _476 > 0
+local _479 = (_476 % 2)
+local _480 = (_477 % 2)
+local _ = _479 ~= _480
+local _ = _479 == _480
+local _485 = ((_476 - _479) / 2)
+local _486 = ((_477 - _480) / 2)
+local _ = _485 > 0
+local _488 = (_485 % 2)
+local _489 = (_486 % 2)
+local _ = _488 ~= _489
+local _ = _488 == _489
+local _494 = ((_485 - _488) / 2)
+local _495 = ((_486 - _489) / 2)
+local _ = _494 > 0
+local _497 = (_494 % 2)
+local _498 = (_495 % 2)
+local _ = _497 ~= _498
+local _ = _497 == _498
+local _503 = ((_494 - _497) / 2)
+local _504 = ((_495 - _498) / 2)
+local _ = _503 > 0
+local _506 = (_503 % 2)
+local _507 = (_504 % 2)
+local _ = _506 ~= _507
+local _ = _506 == _507
+local _512 = ((_503 - _506) / 2)
+local _513 = ((_504 - _507) / 2)
+local _ = _512 > 0
+local _515 = (_512 % 2)
+local _516 = (_513 % 2)
+local _ = _515 ~= _516
+local _ = _515 == _516
+local _521 = ((_512 - _515) / 2)
+local _522 = ((_513 - _516) / 2)
+local _ = _521 > 0
+local _524 = (_521 % 2)
+local _525 = (_522 % 2)
+local _ = _524 ~= _525
+local _ = _524 == _525
+local _530 = ((_521 - _524) / 2)
+local _531 = ((_522 - _525) / 2)
+local _ = _530 > 0
+local _533 = (_530 % 2)
+local _534 = (_531 % 2)
+local _ = _533 ~= _534
+local _ = _533 == _534
+local _539 = ((_530 - _533) / 2)
+local _540 = ((_531 - _534) / 2)
+local _ = _539 > 0
+local _542 = (_539 % 2)
+local _543 = (_540 % 2)
+local _ = _542 ~= _543
+local _ = _542 == _543
+local _548 = ((_539 - _542) / 2)
+local _549 = ((_540 - _543) / 2)
+local _ = _548 > 0
+local _551 = (_548 % 2)
+local _552 = (_549 % 2)
+local _ = _551 ~= _552
+local _ = _551 == _552
+local _557 = ((_548 - _551) / 2)
+local _558 = ((_549 - _552) / 2)
+local _ = _557 > 0
+local _560 = (_557 % 2)
+local _561 = (_558 % 2)
+local _ = _560 ~= _561
+local _ = _560 == _561
+local _566 = ((_557 - _560) / 2)
+local _567 = ((_558 - _561) / 2)
+local _ = _566 > 0
+local _569 = (_566 % 2)
+local _570 = (_567 % 2)
+local _ = _569 ~= _570
+local _ = _569 == _570
+local _575 = ((_566 - _569) / 2)
+local _576 = ((_567 - _570) / 2)
+local _ = _575 > 0
+local _578 = (_575 % 2)
+local _579 = (_576 % 2)
+local _ = _578 ~= _579
+local _ = _578 == _579
+local _584 = ((_575 - _578) / 2)
+local _585 = ((_576 - _579) / 2)
+local _ = _584 > 0
+local _587 = (_584 % 2)
+local _588 = (_585 % 2)
+local _ = _587 ~= _588
+local _ = _587 == _588
+local _593 = ((_584 - _587) / 2)
+local _594 = ((_585 - _588) / 2)
+local _ = _593 > 0
+local _596 = (_593 % 2)
+local _597 = (_594 % 2)
+local _ = _596 ~= _597
+local _ = _596 == _597
+local _602 = ((_593 - _596) / 2)
+local _603 = ((_594 - _597) / 2)
+local _ = _602 > 0
+local _605 = (_602 % 2)
+local _606 = (_603 % 2)
+local _ = _605 ~= _606
+local _ = _605 == _606
+local _611 = ((_602 - _605) / 2)
+local _612 = ((_603 - _606) / 2)
+local _ = _611 > 0
+local _614 = (_611 % 2)
+local _615 = (_612 % 2)
+local _ = _614 ~= _615
+local _ = _614 == _615
+local _620 = ((_611 - _614) / 2)
+local _621 = ((_612 - _615) / 2)
+local _ = _620 > 0
+local _623 = (_620 % 2)
+local _624 = (_621 % 2)
+local _ = _623 ~= _624
+local _ = _623 == _624
+local _629 = ((_620 - _623) / 2)
+local _630 = ((_621 - _624) / 2)
+local _ = _629 > 0
+local _632 = (_629 % 2)
+local _633 = (_630 % 2)
+local _ = _632 ~= _633
+local _ = _632 == _633
+local _638 = ((_629 - _632) / 2)
+local _639 = ((_630 - _633) / 2)
+local _ = _638 > 0
+local _641 = (_638 % 2)
+local _642 = (_639 % 2)
+local _ = _641 ~= _642
+local _ = _641 == _642
+local _647 = ((_638 - _641) / 2)
+local _648 = ((_639 - _642) / 2)
+local _ = _647 > 0
+local _650 = (_647 % 2)
+local _651 = (_648 % 2)
+local _ = _650 ~= _651
+local _ = _650 == _651
+local _656 = ((_647 - _650) / 2)
+local _657 = ((_648 - _651) / 2)
+local _ = _656 > 0
+local _659 = (_656 % 2)
+local _660 = (_657 % 2)
+local _ = _659 ~= _660
+local _ = _659 == _660
+local _665 = ((_656 - _659) / 2)
+local _666 = ((_657 - _660) / 2)
+local _ = _665 > 0
+local _668 = (_665 % 2)
+local _669 = (_666 % 2)
+local _ = _668 ~= _669
+local _ = _668 == _669
+local _674 = ((_665 - _668) / 2)
+local _675 = ((_666 - _669) / 2)
+local _ = _674 > 0
+local _677 = (_674 % 2)
+local _678 = (_675 % 2)
+local _ = _677 ~= _678
+local _ = _677 == _678
+local _683 = ((_674 - _677) / 2)
+local _684 = ((_675 - _678) / 2)
+local _ = _683 > 0
+local _686 = (_683 % 2)
+local _687 = (_684 % 2)
+local _ = _686 ~= _687
+local _ = _686 == _687
+local _692 = ((_683 - _686) / 2)
+local _693 = ((_684 - _687) / 2)
+local _ = _692 > 0
+local _695 = (_692 % 2)
+local _696 = (_693 % 2)
+local _ = _695 ~= _696
+local _ = _695 == _696
+local _701 = ((_692 - _695) / 2)
+local _702 = ((_693 - _696) / 2)
+local _ = _701 > 0
+local _704 = (_701 % 2)
+local _705 = (_702 % 2)
+local _ = _704 ~= _705
+local _ = _704 == _705
+local _710 = ((_701 - _704) / 2)
+local _711 = ((_702 - _705) / 2)
+local _ = _710 > 0
+local _713 = (_710 % 2)
+local _714 = (_711 % 2)
+local _ = _713 ~= _714
+local _ = _713 == _714
+local _719 = ((_710 - _713) / 2)
+local _720 = ((_711 - _714) / 2)
+local _ = _719 > 0
+local _722 = (_719 % 2)
+local _723 = (_720 % 2)
+local _ = _722 ~= _723
+local _ = _722 == _723
+local _728 = ((_719 - _722) / 2)
+local _729 = ((_720 - _723) / 2)
+local _ = _728 > 0
+local _731 = (_728 % 2)
+local _732 = (_729 % 2)
+local _ = _731 ~= _732
+local _ = _731 == _732
+local _737 = ((_728 - _731) / 2)
+local _738 = ((_729 - _732) / 2)
+local _ = _737 > 0
+local _740 = (_737 % 2)
+local _741 = (_738 % 2)
+local _ = _740 ~= _741
+local _ = _740 == _741
+local _746 = ((_737 - _740) / 2)
+local _747 = ((_738 - _741) / 2)
+local _ = _746 > 0
+local _749 = (_746 % 2)
+local _750 = (_747 % 2)
+local _ = _749 ~= _750
+local _ = _749 == _750
+local _755 = ((_746 - _749) / 2)
+local _756 = ((_747 - _750) / 2)
+local _ = _755 > 0
+local _758 = (_755 % 2)
+local _759 = (_756 % 2)
+local _ = _758 ~= _759
+local _ = _758 == _759
+local _764 = ((_755 - _758) / 2)
+local _765 = ((_756 - _759) / 2)
+local _ = _764 > 0
+local _767 = (_764 % 2)
+local _768 = (_765 % 2)
+local _ = _767 ~= _768
+local _ = _767 == _768
+local _773 = ((_764 - _767) / 2)
+local _774 = ((_765 - _768) / 2)
+local _ = _773 > 0
+local _776 = (_773 % 2)
+local _777 = (_774 % 2)
+local _ = _776 ~= _777
+local _ = _776 == _777
+local _782 = ((_773 - _776) / 2)
+local _783 = ((_774 - _777) / 2)
+local _ = _782 > 0
+local _785 = (_782 % 2)
+local _786 = (_783 % 2)
+local _ = _785 ~= _786
+local _ = _785 == _786
+local _791 = ((_782 - _785) / 2)
+local _792 = ((_783 - _786) / 2)
+local _ = _791 > 0
+local _794 = (_791 % 2)
+local _795 = (_792 % 2)
+local _ = _794 ~= _795
+local _ = _794 == _795
+local _800 = ((_791 - _794) / 2)
+local _801 = ((_792 - _795) / 2)
+local _ = _800 > 0
+local _803 = (_800 % 2)
+local _804 = (_801 % 2)
+local _ = _803 ~= _804
+local _ = _803 == _804
+local _809 = ((_800 - _803) / 2)
+local _810 = ((_801 - _804) / 2)
+local _ = _809 > 0
+local _812 = (_809 % 2)
+local _813 = (_810 % 2)
+local _ = _812 ~= _813
+local _ = _812 == _813
+local _818 = ((_809 - _812) / 2)
+local _819 = ((_810 - _813) / 2)
+local _ = _818 > 0
+local _821 = (_818 % 2)
+local _822 = (_819 % 2)
+local _ = _821 ~= _822
+local _ = _821 == _822
+local _827 = ((_818 - _821) / 2)
+local _828 = ((_819 - _822) / 2)
+local _ = _827 > 0
+local _830 = (_827 % 2)
+local _831 = (_828 % 2)
+local _ = _830 ~= _831
+local _ = _830 == _831
+local _836 = ((_827 - _830) / 2)
+local _837 = ((_828 - _831) / 2)
+local _ = _836 > 0
+local _839 = (_836 % 2)
+local _840 = (_837 % 2)
+local _ = _839 ~= _840
+local _ = _839 == _840
+local _845 = ((_836 - _839) / 2)
+local _846 = ((_837 - _840) / 2)
+local _ = _845 > 0
+local _848 = (_845 % 2)
+local _849 = (_846 % 2)
+local _ = _848 ~= _849
+local _ = _848 == _849
+local _854 = ((_845 - _848) / 2)
+local _855 = ((_846 - _849) / 2)
+local _ = _854 > 0
+local _857 = (_854 % 2)
+local _858 = (_855 % 2)
+local _ = _857 ~= _858
+local _ = _857 == _858
+local _863 = ((_854 - _857) / 2)
+local _864 = ((_855 - _858) / 2)
+local _ = _863 > 0
+local _866 = (_863 % 2)
+local _867 = (_864 % 2)
+local _ = _866 ~= _867
+local _ = _866 == _867
+local _872 = ((_863 - _866) / 2)
+local _873 = ((_864 - _867) / 2)
+local _ = _872 > 0
+local _875 = (_872 % 2)
+local _876 = (_873 % 2)
+local _ = _875 ~= _876
+local _ = _875 == _876
+local _881 = ((_872 - _875) / 2)
+local _882 = ((_873 - _876) / 2)
+local _ = _881 > 0
+local _884 = (_881 % 2)
+local _885 = (_882 % 2)
+local _ = _884 ~= _885
+local _ = _884 == _885
+local _890 = ((_881 - _884) / 2)
+local _891 = ((_882 - _885) / 2)
+local _ = _890 > 0
+local _893 = (_890 % 2)
+local _894 = (_891 % 2)
+local _ = _893 ~= _894
+local _ = _893 == _894
+local _899 = ((_890 - _893) / 2)
+local _900 = ((_891 - _894) / 2)
+local _ = _899 > 0
+local _902 = (_899 % 2)
+local _903 = (_900 % 2)
+local _ = _902 ~= _903
+local _ = _902 == _903
+local _908 = ((_899 - _902) / 2)
+local _909 = ((_900 - _903) / 2)
+local _ = _908 > 0
+local _911 = (_908 % 2)
+local _912 = (_909 % 2)
+local _ = _911 ~= _912
+local _ = _911 == _912
+local _917 = ((_908 - _911) / 2)
+local _918 = ((_909 - _912) / 2)
+local _ = _917 > 0
+local _920 = (_917 % 2)
+local _921 = (_918 % 2)
+local _ = _920 ~= _921
+local _ = _920 == _921
+local _926 = ((_917 - _920) / 2)
+local _927 = ((_918 - _921) / 2)
+local _ = _926 > 0
+local _929 = (_926 % 2)
+local _930 = (_927 % 2)
+local _ = _929 ~= _930
+local _ = _929 == _930
+local _935 = ((_926 - _929) / 2)
+local _936 = ((_927 - _930) / 2)
+local _ = _935 > 0
+local _938 = (_935 % 2)
+local _939 = (_936 % 2)
+local _ = _938 ~= _939
+local _ = _938 == _939
+local _944 = ((_935 - _938) / 2)
+local _945 = ((_936 - _939) / 2)
+local _ = _944 > 0
+local _947 = (_944 % 2)
+local _948 = (_945 % 2)
+local _ = _947 ~= _948
+local _ = _947 == _948
+local _953 = ((_944 - _947) / 2)
+local _954 = ((_945 - _948) / 2)
+local _ = _953 > 0
+local _956 = (_953 % 2)
+local _957 = (_954 % 2)
+local _ = _956 ~= _957
+local _ = _956 == _957
+local _962 = ((_953 - _956) / 2)
+local _963 = ((_954 - _957) / 2)
+local _ = _962 > 0
+local _965 = (_962 % 2)
+local _966 = (_963 % 2)
+local _ = _965 ~= _966
+local _ = _965 == _966
+local _971 = ((_962 - _965) / 2)
+local _972 = ((_963 - _966) / 2)
+local _ = _971 > 0
+local _974 = (_971 % 2)
+local _975 = (_972 % 2)
+local _ = _974 ~= _975
+local _ = _974 == _975
+local _980 = ((_971 - _974) / 2)
+local _981 = ((_972 - _975) / 2)
+local _ = _980 > 0
+local _983 = (_980 % 2)
+local _984 = (_981 % 2)
+local _ = _983 ~= _984
+local _ = _983 == _984
+local _989 = ((_980 - _983) / 2)
+local _990 = ((_981 - _984) / 2)
+local _ = _989 > 0
+local _992 = (_989 % 2)
+local _993 = (_990 % 2)
+local _ = _992 ~= _993
+local _ = _992 == _993
+local _998 = ((_989 - _992) / 2)
+local _999 = ((_990 - _993) / 2)
+local _ = _998 > 0
+local _1001 = (_998 % 2)
+local _1002 = (_999 % 2)
+local _ = _1001 ~= _1002
+local _ = _1001 == _1002
+local _1007 = ((_998 - _1001) / 2)
+local _1008 = ((_999 - _1002) / 2)
+local _ = _1007 > 0
+local _1010 = (_1007 % 2)
+local _1011 = (_1008 % 2)
+local _ = _1010 ~= _1011
+local _ = _1010 == _1011
+local _1016 = ((_1007 - _1010) / 2)
+local _1017 = ((_1008 - _1011) / 2)
+local _ = _1016 > 0
+local _1019 = (_1016 % 2)
+local _1020 = (_1017 % 2)
+local _ = _1019 ~= _1020
+local _ = _1019 == _1020
+local _1025 = ((_1016 - _1019) / 2)
+local _1026 = ((_1017 - _1020) / 2)
+local _ = _1025 > 0
+local _1028 = (_1025 % 2)
+local _1029 = (_1026 % 2)
+local _ = _1028 ~= _1029
+local _ = _1028 == _1029
+local _1034 = ((_1025 - _1028) / 2)
+local _1035 = ((_1026 - _1029) / 2)
+local _ = _1034 > 0
+local _1037 = (_1034 % 2)
+local _1038 = (_1035 % 2)
+local _ = _1037 ~= _1038
+local _ = _1037 == _1038
+local _1043 = ((_1034 - _1037) / 2)
+local _1044 = ((_1035 - _1038) / 2)
+local _ = _1043 > 0
+local _1046 = (_1043 % 2)
+local _1047 = (_1044 % 2)
+local _ = _1046 ~= _1047
+local _ = _1046 == _1047
+local _1052 = ((_1043 - _1046) / 2)
+local _1053 = ((_1044 - _1047) / 2)
+local _ = _1052 > 0
+local _1055 = (_1052 % 2)
+local _1056 = (_1053 % 2)
+local _ = _1055 ~= _1056
+local _ = _1055 == _1056
+local _1061 = ((_1052 - _1055) / 2)
+local _1062 = ((_1053 - _1056) / 2)
+local _ = _1061 > 0
+local _1064 = (_1061 % 2)
+local _1065 = (_1062 % 2)
+local _ = _1064 ~= _1065
+local _ = _1064 == _1065
+local _1070 = ((_1061 - _1064) / 2)
+local _1071 = ((_1062 - _1065) / 2)
+local _ = _1070 > 0
+local _1073 = (_1070 % 2)
+local _1074 = (_1071 % 2)
+local _ = _1073 ~= _1074
+local _ = _1073 == _1074
+local _1079 = ((_1070 - _1073) / 2)
+local _1080 = ((_1071 - _1074) / 2)
+local _ = _1079 > 0
+local _1082 = (_1079 % 2)
+local _1083 = (_1080 % 2)
+local _ = _1082 ~= _1083
+local _ = _1082 == _1083
+local _1088 = ((_1079 - _1082) / 2)
+local _1089 = ((_1080 - _1083) / 2)
+local _ = _1088 > 0
+local _1091 = (_1088 % 2)
+local _1092 = (_1089 % 2)
+local _ = _1091 ~= _1092
+local _ = _1091 == _1092
+local _1097 = ((_1088 - _1091) / 2)
+local _1098 = ((_1089 - _1092) / 2)
+local _ = _1097 > 0
+local _1100 = (_1097 % 2)
+local _1101 = (_1098 % 2)
+local _ = _1100 ~= _1101
+local _ = _1100 == _1101
+local _1106 = ((_1097 - _1100) / 2)
+local _1107 = ((_1098 - _1101) / 2)
+local _ = _1106 > 0
+local _1109 = (_1106 % 2)
+local _1110 = (_1107 % 2)
+local _ = _1109 ~= _1110
+local _ = _1109 == _1110
+local _1115 = ((_1106 - _1109) / 2)
+local _1116 = ((_1107 - _1110) / 2)
+local _ = _1115 > 0
+local _1118 = (_1115 % 2)
+local _1119 = (_1116 % 2)
+local _ = _1118 ~= _1119
+local _ = _1118 == _1119
+local _1124 = ((_1115 - _1118) / 2)
+local _1125 = ((_1116 - _1119) / 2)
+local _ = _1124 > 0
+local _1127 = (_1124 % 2)
+local _1128 = (_1125 % 2)
+local _ = _1127 ~= _1128
+local _ = _1127 == _1128
+local _1133 = ((_1124 - _1127) / 2)
+local _1134 = ((_1125 - _1128) / 2)
+local _ = _1133 > 0
+local _1136 = (_1133 % 2)
+local _1137 = (_1134 % 2)
+local _ = _1136 ~= _1137
+local _ = _1136 == _1137
+local _1142 = ((_1133 - _1136) / 2)
+local _1143 = ((_1134 - _1137) / 2)
+local _ = _1142 > 0
+local _1145 = (_1142 % 2)
+local _1146 = (_1143 % 2)
+local _ = _1145 ~= _1146
+local _ = _1145 == _1146
+local _1151 = ((_1142 - _1145) / 2)
+local _1152 = ((_1143 - _1146) / 2)
+local _ = _1151 > 0
+local _1154 = (_1151 % 2)
+local _1155 = (_1152 % 2)
+local _ = _1154 ~= _1155
+local _ = _1154 == _1155
+local _1160 = ((_1151 - _1154) / 2)
+local _1161 = ((_1152 - _1155) / 2)
+local _ = _1160 > 0
+local _1163 = (_1160 % 2)
+local _1164 = (_1161 % 2)
+local _ = _1163 ~= _1164
+local _ = _1163 == _1164
+local _1169 = ((_1160 - _1163) / 2)
+local _1170 = ((_1161 - _1164) / 2)
+local _ = _1169 > 0
+local _1172 = (_1169 % 2)
+local _1173 = (_1170 % 2)
+local _ = _1172 ~= _1173
+local _ = _1172 == _1173
+local _1178 = ((_1169 - _1172) / 2)
+local _1179 = ((_1170 - _1173) / 2)
+local _ = _1178 > 0
+local _1181 = (_1178 % 2)
+local _1182 = (_1179 % 2)
+local _ = _1181 ~= _1182
+local _ = _1181 == _1182
+local _1187 = ((_1178 - _1181) / 2)
+local _1188 = ((_1179 - _1182) / 2)
+local _ = _1187 > 0
+local _1190 = (_1187 % 2)
+local _1191 = (_1188 % 2)
+local _ = _1190 ~= _1191
+local _ = _1190 == _1191
+local _1196 = ((_1187 - _1190) / 2)
+local _1197 = ((_1188 - _1191) / 2)
+local _ = _1196 > 0
+local _1199 = (_1196 % 2)
+local _1200 = (_1197 % 2)
+local _ = _1199 ~= _1200
+local _ = _1199 == _1200
+local _1205 = ((_1196 - _1199) / 2)
+local _1206 = ((_1197 - _1200) / 2)
+local _ = _1205 > 0
+local _1208 = (_1205 % 2)
+local _1209 = (_1206 % 2)
+local _ = _1208 ~= _1209
+local _ = _1208 == _1209
+local _1214 = ((_1205 - _1208) / 2)
+local _1215 = ((_1206 - _1209) / 2)
+local _ = _1214 > 0
+local _1217 = (_1214 % 2)
+local _1218 = (_1215 % 2)
+local _ = _1217 ~= _1218
+local _ = _1217 == _1218
+local _1223 = ((_1214 - _1217) / 2)
+local _1224 = ((_1215 - _1218) / 2)
+local _ = _1223 > 0
+local _1226 = (_1223 % 2)
+local _1227 = (_1224 % 2)
+local _ = _1226 ~= _1227
+local _ = _1226 == _1227
+local _1232 = ((_1223 - _1226) / 2)
+local _1233 = ((_1224 - _1227) / 2)
+local _ = _1232 > 0
+local _1235 = (_1232 % 2)
+local _1236 = (_1233 % 2)
+local _ = _1235 ~= _1236
+local _ = _1235 == _1236
+local _1241 = ((_1232 - _1235) / 2)
+local _1242 = ((_1233 - _1236) / 2)
+local _ = _1241 > 0
+local _1244 = (_1241 % 2)
+local _1245 = (_1242 % 2)
+local _ = _1244 ~= _1245
+local _ = _1244 == _1245
+local _1250 = ((_1241 - _1244) / 2)
+local _1251 = ((_1242 - _1245) / 2)
+local _ = _1250 > 0
+local _1253 = (_1250 % 2)
+local _1254 = (_1251 % 2)
+local _ = _1253 ~= _1254
+local _ = _1253 == _1254
+local _1259 = ((_1250 - _1253) / 2)
+local _1260 = ((_1251 - _1254) / 2)
+local _ = _1259 > 0
+local _1262 = (_1259 % 2)
+local _1263 = (_1260 % 2)
+local _ = _1262 ~= _1263
+local _ = _1262 == _1263
+local _1268 = ((_1259 - _1262) / 2)
+local _1269 = ((_1260 - _1263) / 2)
+local _ = _1268 > 0
+local _1271 = (_1268 % 2)
+local _1272 = (_1269 % 2)
+local _ = _1271 ~= _1272
+local _ = _1271 == _1272
+local _1277 = ((_1268 - _1271) / 2)
+local _1278 = ((_1269 - _1272) / 2)
+local _ = _1277 > 0
+local _1280 = (_1277 % 2)
+local _1281 = (_1278 % 2)
+local _ = _1280 ~= _1281
+local _ = _1280 == _1281
+local _1286 = ((_1277 - _1280) / 2)
+local _1287 = ((_1278 - _1281) / 2)
+local _ = _1286 > 0
+local _1289 = (_1286 % 2)
+local _1290 = (_1287 % 2)
+local _ = _1289 ~= _1290
+local _ = _1289 == _1290
+local _1295 = ((_1286 - _1289) / 2)
+local _1296 = ((_1287 - _1290) / 2)
+local _ = _1295 > 0
+local _1298 = (_1295 % 2)
+local _1299 = (_1296 % 2)
+local _ = _1298 ~= _1299
+local _ = _1298 == _1299
+local _1304 = ((_1295 - _1298) / 2)
+local _1305 = ((_1296 - _1299) / 2)
+local _ = _1304 > 0
+local _1307 = (_1304 % 2)
+local _1308 = (_1305 % 2)
+local _ = _1307 ~= _1308
+local _ = _1307 == _1308
+local _1313 = ((_1304 - _1307) / 2)
+local _1314 = ((_1305 - _1308) / 2)
+local _ = _1313 > 0
+local _1316 = (_1313 % 2)
+local _1317 = (_1314 % 2)
+local _ = _1316 ~= _1317
+local _ = _1316 == _1317
+local _1322 = ((_1313 - _1316) / 2)
+local _1323 = ((_1314 - _1317) / 2)
+local _ = _1322 > 0
+local _1325 = (_1322 % 2)
+local _1326 = (_1323 % 2)
+local _ = _1325 ~= _1326
+local _ = _1325 == _1326
+local _1331 = ((_1322 - _1325) / 2)
+local _1332 = ((_1323 - _1326) / 2)
+local _ = _1331 > 0
+local _1334 = (_1331 % 2)
+local _1335 = (_1332 % 2)
+local _ = _1334 ~= _1335
+local _ = _1334 == _1335
+local _1340 = ((_1331 - _1334) / 2)
+local _1341 = ((_1332 - _1335) / 2)
+local _ = _1340 > 0
+local _1343 = (_1340 % 2)
+local _1344 = (_1341 % 2)
+local _ = _1343 ~= _1344
+local _ = _1343 == _1344
+local _1349 = ((_1340 - _1343) / 2)
+local _1350 = ((_1341 - _1344) / 2)
+local _ = _1349 > 0
+local _1352 = (_1349 % 2)
+local _1353 = (_1350 % 2)
+local _ = _1352 ~= _1353
+local _ = _1352 == _1353
+local _1358 = ((_1349 - _1352) / 2)
+local _1359 = ((_1350 - _1353) / 2)
+local _ = _1358 > 0
+local _1361 = (_1358 % 2)
+local _1362 = (_1359 % 2)
+local _ = _1361 ~= _1362
+local _ = _1361 == _1362
+local _1367 = ((_1358 - _1361) / 2)
+local _1368 = ((_1359 - _1362) / 2)
+local _ = _1367 > 0
+local _1370 = (_1367 % 2)
+local _1371 = (_1368 % 2)
+local _ = _1370 ~= _1371
+local _ = _1370 == _1371
+local _1376 = ((_1367 - _1370) / 2)
+local _1377 = ((_1368 - _1371) / 2)
+local _ = _1376 > 0
+local _1379 = (_1376 % 2)
+local _1380 = (_1377 % 2)
+local _ = _1379 ~= _1380
+local _ = _1379 == _1380
+local _1385 = ((_1376 - _1379) / 2)
+local _1386 = ((_1377 - _1380) / 2)
+local _ = _1385 > 0
+local _1388 = (_1385 % 2)
+local _1389 = (_1386 % 2)
+local _ = _1388 ~= _1389
+local _ = _1388 == _1389
+local _1394 = ((_1385 - _1388) / 2)
+local _1395 = ((_1386 - _1389) / 2)
+local _ = _1394 > 0
+local _1397 = (_1394 % 2)
+local _1398 = (_1395 % 2)
+local _ = _1397 ~= _1398
+local _ = _1397 == _1398
+local _1403 = ((_1394 - _1397) / 2)
+local _1404 = ((_1395 - _1398) / 2)
+local _ = _1403 > 0
+local _1406 = (_1403 % 2)
+local _1407 = (_1404 % 2)
+local _ = _1406 ~= _1407
+local _ = _1406 == _1407
+local _1412 = ((_1403 - _1406) / 2)
+local _1413 = ((_1404 - _1407) / 2)
+local _ = _1412 > 0
+local _1415 = (_1412 % 2)
+local _1416 = (_1413 % 2)
+local _ = _1415 ~= _1416
+local _ = _1415 == _1416
+local _1421 = ((_1412 - _1415) / 2)
+local _1422 = ((_1413 - _1416) / 2)
+local _ = _1421 > 0
+local _1424 = (_1421 % 2)
+local _1425 = (_1422 % 2)
+local _ = _1424 ~= _1425
+local _ = _1424 == _1425
+local _1430 = ((_1421 - _1424) / 2)
+local _1431 = ((_1422 - _1425) / 2)
+local _ = _1430 > 0
+local _1433 = (_1430 % 2)
+local _1434 = (_1431 % 2)
+local _ = _1433 ~= _1434
+local _ = _1433 == _1434
+local _1439 = ((_1430 - _1433) / 2)
+local _1440 = ((_1431 - _1434) / 2)
+local _ = _1439 > 0
+local _1442 = (_1439 % 2)
+local _1443 = (_1440 % 2)
+local _ = _1442 ~= _1443
+local _ = _1442 == _1443
+local _1448 = ((_1439 - _1442) / 2)
+local _1449 = ((_1440 - _1443) / 2)
+local _ = _1448 > 0
+local _1451 = (_1448 % 2)
+local _1452 = (_1449 % 2)
+local _ = _1451 ~= _1452
+local _ = _1451 == _1452
+local _1457 = ((_1448 - _1451) / 2)
+local _1458 = ((_1449 - _1452) / 2)
+local _ = _1457 > 0
+local _1460 = (_1457 % 2)
+local _1461 = (_1458 % 2)
+local _ = _1460 ~= _1461
+local _ = _1460 == _1461
+local _1466 = ((_1457 - _1460) / 2)
+local _1467 = ((_1458 - _1461) / 2)
+local _ = _1466 > 0
+local _1469 = (_1466 % 2)
+local _1470 = (_1467 % 2)
+local _ = _1469 ~= _1470
+local _ = _1469 == _1470
+local _1475 = ((_1466 - _1469) / 2)
+local _1476 = ((_1467 - _1470) / 2)
+local _ = _1475 > 0
+local _1478 = (_1475 % 2)
+local _1479 = (_1476 % 2)
+local _ = _1478 ~= _1479
+local _ = _1478 == _1479
+local _1484 = ((_1475 - _1478) / 2)
+local _1485 = ((_1476 - _1479) / 2)
+local _ = _1484 > 0
+local _1487 = (_1484 % 2)
+local _1488 = (_1485 % 2)
+local _ = _1487 ~= _1488
+local _ = _1487 == _1488
+local _1493 = ((_1484 - _1487) / 2)
+local _1494 = ((_1485 - _1488) / 2)
+local _ = _1493 > 0
+local _1496 = (_1493 % 2)
+local _1497 = (_1494 % 2)
+local _ = _1496 ~= _1497
+local _ = _1496 == _1497
+local _1502 = ((_1493 - _1496) / 2)
+local _1503 = ((_1494 - _1497) / 2)
+local _ = _1502 > 0
+local _1505 = (_1502 % 2)
+local _1506 = (_1503 % 2)
+local _ = _1505 ~= _1506
+local _ = _1505 == _1506
+local _1511 = ((_1502 - _1505) / 2)
+local _1512 = ((_1503 - _1506) / 2)
+local _ = _1511 > 0
+local _1514 = (_1511 % 2)
+local _1515 = (_1512 % 2)
+local _ = _1514 ~= _1515
+local _ = _1514 == _1515
+local _1520 = ((_1511 - _1514) / 2)
+local _1521 = ((_1512 - _1515) / 2)
+local _ = _1520 > 0
+local _1523 = (_1520 % 2)
+local _1524 = (_1521 % 2)
+local _ = _1523 ~= _1524
+local _ = _1523 == _1524
+local _1529 = ((_1520 - _1523) / 2)
+local _1530 = ((_1521 - _1524) / 2)
+local _ = _1529 > 0
+local _1532 = (_1529 % 2)
+local _1533 = (_1530 % 2)
+local _ = _1532 ~= _1533
+local _ = _1532 == _1533
+local _1538 = ((_1529 - _1532) / 2)
+local _1539 = ((_1530 - _1533) / 2)
+local _ = _1538 > 0
+local _1541 = (_1538 % 2)
+local _1542 = (_1539 % 2)
+local _ = _1541 ~= _1542
+local _ = _1541 == _1542
+local _1547 = ((_1538 - _1541) / 2)
+local _1548 = ((_1539 - _1542) / 2)
+local _ = _1547 > 0
+local _1550 = (_1547 % 2)
+local _1551 = (_1548 % 2)
+local _ = _1550 ~= _1551
+local _ = _1550 == _1551
+local _1556 = ((_1547 - _1550) / 2)
+local _1557 = ((_1548 - _1551) / 2)
+local _ = _1556 > 0
+local _1559 = (_1556 % 2)
+local _1560 = (_1557 % 2)
+local _ = _1559 ~= _1560
+local _ = _1559 == _1560
+local _1565 = ((_1556 - _1559) / 2)
+local _1566 = ((_1557 - _1560) / 2)
+local _ = _1565 > 0
+local _1568 = (_1565 % 2)
+local _1569 = (_1566 % 2)
+local _ = _1568 ~= _1569
+local _ = _1568 == _1569
+local _1574 = ((_1565 - _1568) / 2)
+local _1575 = ((_1566 - _1569) / 2)
+local _ = _1574 > 0
+local _1577 = (_1574 % 2)
+local _1578 = (_1575 % 2)
+local _ = _1577 ~= _1578
+local _ = _1577 == _1578
+local _1583 = ((_1574 - _1577) / 2)
+local _1584 = ((_1575 - _1578) / 2)
+local _ = _1583 > 0
+local _1586 = (_1583 % 2)
+local _1587 = (_1584 % 2)
+local _ = _1586 ~= _1587
+local _ = _1586 == _1587
+local _1592 = ((_1583 - _1586) / 2)
+local _1593 = ((_1584 - _1587) / 2)
+local _ = _1592 > 0
+local _1595 = (_1592 % 2)
+local _1596 = (_1593 % 2)
+local _ = _1595 ~= _1596
+local _ = _1595 == _1596
+local _1601 = ((_1592 - _1595) / 2)
+local _1602 = ((_1593 - _1596) / 2)
+local _ = _1601 > 0
+local _1604 = (_1601 % 2)
+local _1605 = (_1602 % 2)
+local _ = _1604 ~= _1605
+local _ = _1604 == _1605
+local _1610 = ((_1601 - _1604) / 2)
+local _1611 = ((_1602 - _1605) / 2)
+local _ = _1610 > 0
+local _1613 = (_1610 % 2)
+local _1614 = (_1611 % 2)
+local _ = _1613 ~= _1614
+local _ = _1613 == _1614
+local _1619 = ((_1610 - _1613) / 2)
+local _1620 = ((_1611 - _1614) / 2)
+local _ = _1619 > 0
+local _1622 = (_1619 % 2)
+local _1623 = (_1620 % 2)
+local _ = _1622 ~= _1623
+local _ = _1622 == _1623
+local _1628 = ((_1619 - _1622) / 2)
+local _1629 = ((_1620 - _1623) / 2)
+local _ = _1628 > 0
+local _1631 = (_1628 % 2)
+local _1632 = (_1629 % 2)
+local _ = _1631 ~= _1632
+local _ = _1631 == _1632
+local _1637 = ((_1628 - _1631) / 2)
+local _1638 = ((_1629 - _1632) / 2)
+local _ = _1637 > 0
+local _1640 = (_1637 % 2)
+local _1641 = (_1638 % 2)
+local _ = _1640 ~= _1641
+local _ = _1640 == _1641
+local _1646 = ((_1637 - _1640) / 2)
+local _1647 = ((_1638 - _1641) / 2)
+local _ = _1646 > 0
+local _1649 = (_1646 % 2)
+local _1650 = (_1647 % 2)
+local _ = _1649 ~= _1650
+local _ = _1649 == _1650
+local _1655 = ((_1646 - _1649) / 2)
+local _1656 = ((_1647 - _1650) / 2)
+local _ = _1655 > 0
+local _1658 = (_1655 % 2)
+local _1659 = (_1656 % 2)
+local _ = _1658 ~= _1659
+local _ = _1658 == _1659
+local _1664 = ((_1655 - _1658) / 2)
+local _1665 = ((_1656 - _1659) / 2)
+local _ = _1664 > 0
+local _1667 = (_1664 % 2)
+local _1668 = (_1665 % 2)
+local _ = _1667 ~= _1668
+local _ = _1667 == _1668
+local _1673 = ((_1664 - _1667) / 2)
+local _1674 = ((_1665 - _1668) / 2)
+local _ = _1673 > 0
+local _1676 = (_1673 % 2)
+local _1677 = (_1674 % 2)
+local _ = _1676 ~= _1677
+local _ = _1676 == _1677
+local _1682 = ((_1673 - _1676) / 2)
+local _1683 = ((_1674 - _1677) / 2)
+local _ = _1682 > 0
+local _1685 = (_1682 % 2)
+local _1686 = (_1683 % 2)
+local _ = _1685 ~= _1686
+local _ = _1685 == _1686
+local _1691 = ((_1682 - _1685) / 2)
+local _1692 = ((_1683 - _1686) / 2)
+local _ = _1691 > 0
+local _1694 = (_1691 % 2)
+local _1695 = (_1692 % 2)
+local _ = _1694 ~= _1695
+local _ = _1694 == _1695
+local _1700 = ((_1691 - _1694) / 2)
+local _1701 = ((_1692 - _1695) / 2)
+local _ = _1700 > 0
+local _1703 = (_1700 % 2)
+local _1704 = (_1701 % 2)
+local _ = _1703 ~= _1704
+local _ = _1703 == _1704
+local _1709 = ((_1700 - _1703) / 2)
+local _1710 = ((_1701 - _1704) / 2)
+local _ = _1709 > 0
+local _1712 = (_1709 % 2)
+local _1713 = (_1710 % 2)
+local _ = _1712 ~= _1713
+local _ = _1712 == _1713
+local _1718 = ((_1709 - _1712) / 2)
+local _1719 = ((_1710 - _1713) / 2)
+local _ = _1718 > 0
+local _1721 = (_1718 % 2)
+local _1722 = (_1719 % 2)
+local _ = _1721 ~= _1722
+local _ = _1721 == _1722
+local _1727 = ((_1718 - _1721) / 2)
+local _1728 = ((_1719 - _1722) / 2)
+local _ = _1727 > 0
+local _1730 = (_1727 % 2)
+local _1731 = (_1728 % 2)
+local _ = _1730 ~= _1731
+local _ = _1730 == _1731
+local _1736 = ((_1727 - _1730) / 2)
+local _1737 = ((_1728 - _1731) / 2)
+local _ = _1736 > 0
+local _1739 = (_1736 % 2)
+local _1740 = (_1737 % 2)
+local _ = _1739 ~= _1740
+local _ = _1739 == _1740
+local _1745 = ((_1736 - _1739) / 2)
+local _1746 = ((_1737 - _1740) / 2)
+local _ = _1745 > 0
+local _1748 = (_1745 % 2)
+local _1749 = (_1746 % 2)
+local _ = _1748 ~= _1749
+local _ = _1748 == _1749
+local _1754 = ((_1745 - _1748) / 2)
+local _1755 = ((_1746 - _1749) / 2)
+local _ = _1754 > 0
+local _1757 = (_1754 % 2)
+local _1758 = (_1755 % 2)
+local _ = _1757 ~= _1758
+local _ = _1757 == _1758
+local _1763 = ((_1754 - _1757) / 2)
+local _1764 = ((_1755 - _1758) / 2)
+local _ = _1763 > 0
+local _1766 = (_1763 % 2)
+local _1767 = (_1764 % 2)
+local _ = _1766 ~= _1767
+local _ = _1766 == _1767
+local _1772 = ((_1763 - _1766) / 2)
+local _1773 = ((_1764 - _1767) / 2)
+local _ = _1772 > 0
+local _1775 = (_1772 % 2)
+local _1776 = (_1773 % 2)
+local _ = _1775 ~= _1776
+local _ = _1775 == _1776
+local _1781 = ((_1772 - _1775) / 2)
+local _1782 = ((_1773 - _1776) / 2)
+local _ = _1781 > 0
+local _1784 = (_1781 % 2)
+local _1785 = (_1782 % 2)
+local _ = _1784 ~= _1785
+local _ = _1784 == _1785
+local _1790 = ((_1781 - _1784) / 2)
+local _1791 = ((_1782 - _1785) / 2)
+local _ = _1790 > 0
+local _1793 = (_1790 % 2)
+local _1794 = (_1791 % 2)
+local _ = _1793 ~= _1794
+local _ = _1793 == _1794
+local _1799 = ((_1790 - _1793) / 2)
+local _1800 = ((_1791 - _1794) / 2)
+local _ = _1799 > 0
+local _1802 = (_1799 % 2)
+local _1803 = (_1800 % 2)
+local _ = _1802 ~= _1803
+local _ = _1802 == _1803
+local _1808 = ((_1799 - _1802) / 2)
+local _1809 = ((_1800 - _1803) / 2)
+local _ = _1808 > 0
+local _1811 = (_1808 % 2)
+local _1812 = (_1809 % 2)
+local _ = _1811 ~= _1812
+local _ = _1811 == _1812
+local _1817 = ((_1808 - _1811) / 2)
+local _1818 = ((_1809 - _1812) / 2)
+local _ = _1817 > 0
+local _1820 = (_1817 % 2)
+local _1821 = (_1818 % 2)
+local _ = _1820 ~= _1821
+local _ = _1820 == _1821
+local _1826 = ((_1817 - _1820) / 2)
+local _1827 = ((_1818 - _1821) / 2)
+local _ = _1826 > 0
+local _1829 = (_1826 % 2)
+local _1830 = (_1827 % 2)
+local _ = _1829 ~= _1830
+local _ = _1829 == _1830
+local _1835 = ((_1826 - _1829) / 2)
+local _1836 = ((_1827 - _1830) / 2)
+local _ = _1835 > 0
+local _1838 = (_1835 % 2)
+local _1839 = (_1836 % 2)
+local _ = _1838 ~= _1839
+local _ = _1838 == _1839
+local _1844 = ((_1835 - _1838) / 2)
+local _1845 = ((_1836 - _1839) / 2)
+local _ = _1844 > 0
+local _1847 = (_1844 % 2)
+local _1848 = (_1845 % 2)
+local _ = _1847 ~= _1848
+local _ = _1847 == _1848
+local _1853 = ((_1844 - _1847) / 2)
+local _ = _1853 > 0
+local _ = _1853 % 2
+local _ = ((_1845 - _1848) / 2) % 2
+
+error('internal 583: <dex: infinitelooperror>')
