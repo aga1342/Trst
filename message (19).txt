@@ -1,0 +1,3646 @@
+-- ╔══════════════════════════════════════════════════════╗
+-- ║   DRAGON NOTIFIER  •  Galaxy Edition v3              ║
+-- ╚══════════════════════════════════════════════════════╝
+
+local CoreGui          = game:GetService("CoreGui")
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService       = game:GetService("RunService")
+local TeleportService  = game:GetService("TeleportService")
+local HttpService      = game:GetService("HttpService")
+local Players          = game:GetService("Players")
+local ReplicatedStorage= game:GetService("ReplicatedStorage")
+local Player           = Players.LocalPlayer
+
+
+;(function()
+-- ════════════════════════════════════════════════════════════════
+-- CREDENTIAL VAULT  v5  ·  5-layer cipher  ·  512-bit key
+-- Layer stack: [rotating-XOR] → [RC4-64] → [bit-rotate/pos] → [reverse] → [running-XOR-chain]
+-- Key: 16 obfuscated 32-bit words (each different derivation)
+-- Cracking requires: undoing all 5 layers + recovering 16 word-expressions
+-- ════════════════════════════════════════════════════════════════
+local _C1={81,216,34,227,17,94,17,180,118,200,81,83,201,130,129,254,250,110,33,136,90,191,18,122,87,168,9,138,26,83,79,12,25,227,22,76,199,125,140,67}
+local _C2={242,209,203,78,194,11,93,27,9,32,23,5,68,50,164,244,237,3,174,244,114,24,210,222,23,254,12,22,22,112,155,193,203,196,251,3,254,208,137,206,161,154,7,36,141,45}
+-- 16 key words -- each stored with a different obfuscation technique
+local _W1 =bit32.bor(bit32.lshift(50046,16),10993)
+local _W2 =bit32.bxor(bit32.bor(bit32.lshift(54039,16),5017),bit32.bor(bit32.lshift(0x5A5A,16),0xA5A5))
+local _W3 =bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(81,8),168),16),bit32.bor(bit32.lshift(226,8),159))
+local _W4 =bit32.bxor(bit32.bor(bit32.lshift(54233,16),30137),bit32.bor(bit32.lshift(0xDEAD,16),0xBEEF))
+local _W5 =bit32.bor(bit32.lshift(bit32.bxor(236,0xFF)*256+bit32.bxor(116,0xFF),16),bit32.bxor(38,0xFF)*256+bit32.bxor(189,0xFF))
+local _W6 =bit32.bor(bit32.lshift(26620,16),7843)
+local _W7 =bit32.bxor(bit32.bor(bit32.lshift(10871,16),12317),bit32.bor(bit32.lshift(0x5A5A,16),0xA5A5))
+local _W8 =bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(79,8),230),16),bit32.bor(bit32.lshift(56,8),202))
+local _W9 =bit32.bxor(bit32.bor(bit32.lshift(30642,16),33693),bit32.bor(bit32.lshift(0xDEAD,16),0xBEEF))
+local _W10=bit32.bor(bit32.lshift(bit32.bxor(163,0xFF)*256+bit32.bxor(123,0xFF),16),bit32.bxor(25,0xFF)*256+bit32.bxor(254,0xFF))
+local _W11=bit32.bor(bit32.lshift(48416,16),63559)
+local _W12=bit32.bxor(bit32.bor(bit32.lshift(25420,16),57195),bit32.bor(bit32.lshift(0x5A5A,16),0xA5A5))
+local _W13=bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(240,8),75),16),bit32.bor(bit32.lshift(40,8),213))
+local _W14=bit32.bxor(bit32.bor(bit32.lshift(41022,16),32747),bit32.bor(bit32.lshift(0xDEAD,16),0xBEEF))
+local _W15=bit32.bor(bit32.lshift(bit32.bxor(210,0xFF)*256+bit32.bxor(89,0xFF),16),bit32.bxor(160,0xFF)*256+bit32.bxor(116,0xFF))
+local _W16=bit32.bor(bit32.lshift(57612,16),18815)
+-- Expand 16 words → 64 bytes
+local _KB={}
+for _,w in ipairs({_W1,_W2,_W3,_W4,_W5,_W6,_W7,_W8,_W9,_W10,_W11,_W12,_W13,_W14,_W15,_W16}) do
+    _KB[#_KB+1]=bit32.rshift(bit32.band(w,0xFF000000),24)
+    _KB[#_KB+1]=bit32.rshift(bit32.band(w,0x00FF0000),16)
+    _KB[#_KB+1]=bit32.rshift(bit32.band(w,0x0000FF00),8)
+    _KB[#_KB+1]=bit32.band(w,0x000000FF)
+end
+-- RC4 KSA
+local function _ksa()
+    local S={}; for i=0,255 do S[i]=i end; local j=0
+    for i=0,255 do j=(j+S[i]+_KB[(i%64)+1])%256; S[i],S[j]=S[j],S[i] end
+    return S
+end
+-- Bit-rotate helpers (pure Lua, no extra libs)
+local function _rl(b,n) n=n%8; return bit32.bor(bit32.lshift(b,n),bit32.rshift(b,8-n))%256 end
+local function _rr(b,n) n=n%8; return bit32.bor(bit32.rshift(b,n),bit32.lshift(b,8-n))%256 end
+-- 5-layer decode
+local function _dec(ct)
+    -- Undo L5: running XOR chain  d[i] = ct[i] ^ d[i-1]
+    local d={ct[1]}; for i=2,#ct do d[i]=bit32.bxor(ct[i],d[i-1]) end
+    -- Undo L4: reverse
+    local rev={}; for i=1,#d do rev[i]=d[#d-i+1] end; d=rev
+    -- Undo L3: bit-rotate right by (pos%7+1)
+    for i=1,#d do d[i]=_rr(d[i],(i-1)%7+1) end
+    -- Undo L2: RC4 (symmetric -- same as encrypt)
+    local S=_ksa(); local ii,jj=0,0
+    for i=1,#d do
+        ii=(ii+1)%256; jj=(jj+S[ii])%256; S[ii],S[jj]=S[jj],S[ii]
+        d[i]=bit32.bxor(d[i],S[(S[ii]+S[jj])%256])
+    end
+    -- Undo L1: rotating XOR with key
+    local r=""
+    for i=1,#d do r=r..string.char(bit32.bxor(d[i],_KB[((i-1)%64)+1])) end
+    return r
+end
+local SUPABASE_URL=_dec(_C1)
+local SUPABASE_KEY=_dec(_C2)
+local SB_H={["Content-Type"]="application/json",["apikey"]=SUPABASE_KEY,["Authorization"]="Bearer "..SUPABASE_KEY}
+local httpReq=request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
+local function sbGet(path)
+    if not httpReq then return nil end
+    local ok,r=pcall(httpReq,{Url=SUPABASE_URL..path,Method="GET",Headers=SB_H})
+    if not ok or not r or not r.Body then return nil end
+    local ok2,d=pcall(HttpService.JSONDecode,HttpService,r.Body); return ok2 and d or nil
+end
+local function sbPost(path,body,del)
+    if not httpReq then return end
+    pcall(httpReq,{Url=SUPABASE_URL..path,Method=del and "DELETE" or "POST",
+        Headers=del and {["apikey"]=SUPABASE_KEY,["Authorization"]="Bearer "..SUPABASE_KEY} or
+            {["Content-Type"]="application/json",["apikey"]=SUPABASE_KEY,["Authorization"]="Bearer "..SUPABASE_KEY,["Prefer"]="resolution=merge-duplicates"},
+        Body=not del and HttpService:JSONEncode(body) or nil})
+end
+local DRAGON_ID    = "130132365047599"
+local DRAGON_ICON  = "rbxthumb://type=Asset&id=" .. DRAGON_ID .. "&w=420&h=420"
+
+-- UI PROTECTION
+-- GUI hardened against spy detection
+local guiParent
+if gethui then
+    local ok, r = pcall(gethui); if ok and r then guiParent = r end
+end
+guiParent = guiParent or CoreGui
+for _, c in ipairs(guiParent:GetChildren()) do
+    if c.Name == "DragonNotifier" then pcall(function() c:Destroy() end) end
+end
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DragonNotifier"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- Protect from spy and viewport listing
+pcall(function() if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end end)
+pcall(function() if protect_gui then protect_gui(ScreenGui) end end)
+ScreenGui.Parent = guiParent
+
+local ActiveConnections = {}
+local function trackConnection(c) table.insert(ActiveConnections, c); return c end
+local function cleanupConnections()
+    for _, c in ipairs(ActiveConnections) do
+        if c and typeof(c) == "RBXScriptConnection" then
+            pcall(function() c:Disconnect() end)
+        end
+    end
+    table.clear(ActiveConnections)
+end
+trackConnection(ScreenGui.Destroying:Connect(cleanupConnections))
+
+-- THEME
+local Theme = {
+    BgDeep     = Color3.fromRGB(10, 8, 14),
+    BgPanel    = Color3.fromRGB(18, 14, 22),
+    BgCard     = Color3.fromRGB(24, 19, 28),
+    BgCardHi   = Color3.fromRGB(32, 25, 36),
+    BgInput    = Color3.fromRGB(20, 16, 25),
+    Orange     = Color3.fromRGB(255, 140, 40),
+    OrangeHi   = Color3.fromRGB(255, 175, 85),
+    OrangeDim  = Color3.fromRGB(200, 100, 30),
+    OrangeDeep = Color3.fromRGB(140, 60, 15),
+    Border     = Color3.fromRGB(48, 38, 55),
+    Text       = Color3.fromRGB(245, 235, 245),
+    TextDim    = Color3.fromRGB(160, 145, 175),
+    TextMute   = Color3.fromRGB(110, 100, 125),
+    Green      = Color3.fromRGB(80, 220, 130),
+    GreenDim   = Color3.fromRGB(40, 160, 90),
+    Red        = Color3.fromRGB(240, 80, 90),
+    TierOG     = Color3.fromRGB(255, 215, 70),
+    TierSecret = Color3.fromRGB(255, 100, 200),
+    TierHigh   = Color3.fromRGB(255, 140, 40),
+    TierMid    = Color3.fromRGB(120, 180, 255),
+    TierLow    = Color3.fromRGB(120, 130, 160),
+}
+-- THEME PALETTES
+local Palettes = {
+    Original = {
+        Accent     = Color3.fromRGB(255,140,40),
+        AccentHi   = Color3.fromRGB(255,175,85),
+        AccentDim  = Color3.fromRGB(200,100,30),
+        AccentDeep = Color3.fromRGB(140,60,15),
+        AccentDark = Color3.fromRGB(15,10,8),
+        BgGradTop  = Color3.fromRGB(28,16,38),
+        BgGradMid  = Color3.fromRGB(14,10,20),
+        BgGradBot  = Color3.fromRGB(8,6,14),
+    },
+    Galaxy = {
+        Accent     = Color3.fromRGB(170,100,255),
+        AccentHi   = Color3.fromRGB(200,145,255),
+        AccentDim  = Color3.fromRGB(130,70,210),
+        AccentDeep = Color3.fromRGB(75,35,140),
+        AccentDark = Color3.fromRGB(10,6,18),
+        BgGradTop  = Color3.fromRGB(45,22,75),
+        BgGradMid  = Color3.fromRGB(22,12,45),
+        BgGradBot  = Color3.fromRGB(8,4,20),
+    },
+    Ocean = {
+        Accent     = Color3.fromRGB(60,170,255),
+        AccentHi   = Color3.fromRGB(115,200,255),
+        AccentDim  = Color3.fromRGB(40,130,210),
+        AccentDeep = Color3.fromRGB(20,75,135),
+        AccentDark = Color3.fromRGB(6,12,22),
+        BgGradTop  = Color3.fromRGB(18,38,65),
+        BgGradMid  = Color3.fromRGB(10,22,42),
+        BgGradBot  = Color3.fromRGB(4,12,24),
+    },
+    Crimson = {
+        Accent     = Color3.fromRGB(240,60,90),
+        AccentHi   = Color3.fromRGB(255,100,120),
+        AccentDim  = Color3.fromRGB(190,40,70),
+        AccentDeep = Color3.fromRGB(100,15,30),
+        AccentDark = Color3.fromRGB(18,5,8),
+        BgGradTop  = Color3.fromRGB(60,12,22),
+        BgGradMid  = Color3.fromRGB(28,8,14),
+        BgGradBot  = Color3.fromRGB(14,4,8),
+    },
+}
+local CurrentTheme = "Original"
+
+-- Registry of objects whose color should swap when theme changes.
+-- Each entry: {obj, prop, key}  -- key looks up Theme[key] for the new value.
+local themedRefs = {}
+local function reg(obj, prop, key) table.insert(themedRefs, {obj=obj, prop=prop, key=key}) end
+
+-- Container for things to do after a theme change beyond simple property swaps
+local themeChangeHooks = {}
+local function onThemeChange(fn) table.insert(themeChangeHooks, fn) end
+
+local function _colorClose(a, b)
+    -- compare with small tolerance since tween rounding can shift values
+    return math.abs(a.R - b.R) < 0.01
+       and math.abs(a.G - b.G) < 0.01
+       and math.abs(a.B - b.B) < 0.01
+end
+
+local function applyTheme(name)
+    local p = Palettes[name] or Palettes.Original
+    -- Remember the OLD palette so we know what colors to replace in the UI
+    local old = Palettes[CurrentTheme] or Palettes.Original
+    CurrentTheme = name
+    -- Update the Theme table itself
+    Theme.Orange     = p.Accent
+    Theme.OrangeHi   = p.AccentHi
+    Theme.OrangeDim  = p.AccentDim
+    Theme.OrangeDeep = p.AccentDeep
+    Theme.TierHigh   = p.Accent
+
+    -- Mappings: any UI color matching old.X → new (p).X
+    local swaps = {
+        { old.Accent,     p.Accent     },
+        { old.AccentHi,   p.AccentHi   },
+        { old.AccentDim,  p.AccentDim  },
+        { old.AccentDeep, p.AccentDeep },
+        { old.AccentDark, p.AccentDark },
+    }
+    local function tryRecolor(obj, prop)
+        local ok, cur = pcall(function() return obj[prop] end)
+        if not ok or typeof(cur) ~= "Color3" then return end
+        for _, pair in ipairs(swaps) do
+            if _colorClose(cur, pair[1]) then
+                pcall(function() obj[prop] = pair[2] end)
+                return
+            end
+        end
+    end
+
+    -- Walk the entire ScreenGui and swap matching colors on every UI obj
+    if ScreenGui then
+        for _, d in ipairs(ScreenGui:GetDescendants()) do
+            if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+                tryRecolor(d, "TextColor3")
+            end
+            if d:IsA("GuiObject") then
+                tryRecolor(d, "BackgroundColor3")
+            end
+            if d:IsA("UIStroke") then
+                tryRecolor(d, "Color")
+            end
+            if d:IsA("ImageLabel") or d:IsA("ImageButton") then
+                tryRecolor(d, "ImageColor3")
+            end
+            if d:IsA("Frame") and d.BackgroundColor3 then
+                -- already handled by GuiObject branch above
+            end
+            -- Recolor UIGradients that contain the accent color
+            if d:IsA("UIGradient") then
+                local seq = d.Color
+                if seq then
+                    local changed = false
+                    local keys = {}
+                    for _, kp in ipairs(seq.Keypoints) do
+                        local c = kp.Value
+                        local newC = c
+                        for _, pair in ipairs(swaps) do
+                            if _colorClose(c, pair[1]) then
+                                newC = pair[2]; changed = true; break
+                            end
+                        end
+                        table.insert(keys, ColorSequenceKeypoint.new(kp.Time, newC))
+                    end
+                    if changed then
+                        pcall(function() d.Color = ColorSequence.new(keys) end)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Registered refs (kept for backward compatibility)
+    for _, r in ipairs(themedRefs) do
+        local v = Theme[r.key]
+        if v then pcall(function() r.obj[r.prop] = v end) end
+    end
+    -- Extra hooks
+    for _, fn in ipairs(themeChangeHooks) do pcall(fn, p) end
+end
+
+
+-- UTIL
+local function create(cn, props)
+    local i = Instance.new(cn)
+    for k, v in pairs(props) do i[k] = v end
+    return i
+end
+local function corner(p, r) return create("UICorner", { CornerRadius = UDim.new(0, r), Parent = p }) end
+local function stroke(p, c, t, tr)
+    return create("UIStroke", {
+        Color = c or Theme.Border, Thickness = t or 1,
+        Transparency = tr or 0,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = p
+    })
+end
+local function tween(o, time, props, style, dir)
+    local t = TweenService:Create(o,
+        TweenInfo.new(time, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props)
+    t:Play(); return t
+end
+local function formatMoney(n)
+    n = tonumber(n) or 0
+    if n >= 1e9 then return string.format("%.2fB", n/1e9)
+    elseif n >= 1e6 then return string.format("%.1fM", n/1e6)
+    elseif n >= 1e3 then return string.format("%.1fK", n/1e3)
+    else return tostring(n) end
+end
+local function timeAgo(secs)
+    secs = math.floor(secs)
+    if secs < 60 then return secs .. "s ago"
+    elseif secs < 3600 then return math.floor(secs/60) .. "m " .. (secs % 60) .. "s ago"
+    else return math.floor(secs/3600) .. "h ago" end
+end
+
+-- ════════════════════════════════════════════════════
+-- HISTORY MODULE (persists across teleports via writefile)
+-- ════════════════════════════════════════════════════
+-- Keeps last 2 mins of finds so if you accidentally join the wrong one,
+-- you can re-join the one you actually wanted from the History tab.
+local HISTORY_FILE   = "DragonNotifier_history.json"
+local HISTORY_WINDOW = 120  -- seconds (2 mins)
+local HISTORY_MAX    = 40   -- cap entries even within window
+local History = {}          -- list of {n=name, v=value, j=jobId, p=placeId, t=epoch}
+local historyRebuilders = {}  -- UI repaint callbacks
+
+local function _historySave()
+    if not writefile then return end
+    pcall(function()
+        writefile(HISTORY_FILE, HttpService:JSONEncode(History))
+    end)
+end
+
+local function _historyLoad()
+    if not (readfile and isfile) then return end
+    if not pcall(isfile, HISTORY_FILE) or not isfile(HISTORY_FILE) then return end
+    pcall(function()
+        local raw = readfile(HISTORY_FILE)
+        if not raw or raw == "" then return end
+        local ok, data = pcall(function() return HttpService:JSONDecode(raw) end)
+        if ok and type(data) == "table" then
+            History = data
+        end
+    end)
+end
+
+local function _historyPrune()
+    local now = os.time()
+    local kept = {}
+    for _, e in ipairs(History) do
+        if type(e) == "table" and e.t and (now - e.t) <= HISTORY_WINDOW then
+            kept[#kept+1] = e
+        end
+    end
+    -- newest first, capped
+    table.sort(kept, function(a, b) return (a.t or 0) > (b.t or 0) end)
+    while #kept > HISTORY_MAX do table.remove(kept) end
+    History = kept
+end
+
+local function historyAdd(itemName, numValue, jobId, placeId)
+    if not itemName or not jobId or jobId == "" then return end
+    -- dedupe: skip if same jobId is already in history within 30s
+    local now = os.time()
+    for _, e in ipairs(History) do
+        if e.j == jobId and (now - (e.t or 0)) < 30 then return end
+    end
+    table.insert(History, 1, {
+        n = itemName, v = numValue, j = jobId,
+        p = placeId or game.PlaceId, t = now,
+    })
+    _historyPrune()
+    _historySave()
+    -- trigger UI repaints
+    for _, fn in ipairs(historyRebuilders) do pcall(fn) end
+end
+
+local function historyGet()
+    _historyPrune()
+    return History
+end
+
+-- Load saved history on script start (survives teleport)
+_historyLoad()
+_historyPrune()
+
+-- Periodic cleanup tick so old entries fall off even if no new finds
+task.spawn(function()
+    while task.wait(15) do
+        _historyPrune()
+        for _, fn in ipairs(historyRebuilders) do pcall(fn) end
+    end
+end)
+
+
+-- ════════════════════════════════════════════════════
+-- STEAL DETECTOR  (module-based detection + obfuscated webhook + 50M+ threshold)
+-- ════════════════════════════════════════════════════
+-- Uses the game's Sync / AData / AShared modules to get accurate mutation +
+-- trait data -- way more reliable than scraping AnimalOverhead text labels.
+-- Webhook URL stays XOR-encoded + base64-chunked so passive scanners can't grep it.
+local _stealDispatch do
+    local _k = {64,172,152,196,175,191,153,150,44,211,171,235,111,85,108,75,102,123,77,120,161,66,15,220,176,52,113,129,204,167,199,194,170,85,177,127,85,164,103,226,114,140,84,244,16,25,104,67,170,107,255,55,50,84,30,247,222,102,120,120,254,169,49,115}
+    local _ch = {
+        "KNjstNyFtrlIutiIACcIZQUUIFfAMmbzx1ET6aPIrL",
+        "GFZIRPYpNe20G/bc0iLVx2k17IBx0YUsGPAA5By+QI",
+        "ERHNqIPj/djdbbDItB0WFmYTIQJP7hZY7N5uC/Oh8Z",
+        "D77wTpBzLxL6sKwh2iPUk4KfA0iUF1EV3DvA==",
+    }
+    local _b64a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    local _b64m = {}
+    for i = 1, #_b64a do _b64m[string.sub(_b64a, i, i)] = i - 1 end
+    local function _b64dec(s)
+        s = string.gsub(s, "[^A-Za-z0-9+/=]", "")
+        local out = {}
+        for i = 1, #s, 4 do
+            local c1 = _b64m[string.sub(s,i,i)]   or 0
+            local c2 = _b64m[string.sub(s,i+1,i+1)] or 0
+            local c3 = _b64m[string.sub(s,i+2,i+2)] or 0
+            local c4 = _b64m[string.sub(s,i+3,i+3)] or 0
+            local n = c1*262144 + c2*4096 + c3*64 + c4
+            out[#out+1] = string.char(math.floor(n/65536) % 256)
+            if string.sub(s,i+2,i+2) ~= "=" then
+                out[#out+1] = string.char(math.floor(n/256) % 256)
+            end
+            if string.sub(s,i+3,i+3) ~= "=" then
+                out[#out+1] = string.char(n % 256)
+            end
+        end
+        return table.concat(out)
+    end
+    local function _resolveUrl()
+        local enc = _b64dec(table.concat(_ch))
+        local out = {}
+        for i = 1, #enc do
+            out[i] = string.char(bit32.bxor(string.byte(enc, i), _k[((i-1) % #_k) + 1]))
+        end
+        return table.concat(out)
+    end
+
+    -- ═══ ELDORADO TRADE VALUES (USD) ═══
+    -- Scraped from eldorado.gg/blog/steal-a-brainrot-trading-values (May 2026)
+    -- Shown next to in-game $/s on the steal alert. Re-fetch periodically as
+    -- values shift weekly. Brainrots not listed get no USD tag.
+    local _PRICES = {
+        ["abyssaloco"]={lo=8,hi=30},["antonio"]={lo=450,hi=1000},
+        ["arcadragon"]={lo=1000,hi=2000},["bunny and eggy"]={lo=30,hi=100},
+        ["burguro and fryuro"]={lo=6,hi=50},["capitano moby"]={lo=15,hi=75},
+        ["celestial pegasus"]={lo=10,hi=50},["centrucci nuclucci"]={lo=20,hi=80},
+        ["cerberus"]={lo=15,hi=75},["chillin chili"]={lo=10,hi=25},
+        ["cloverat clapat"]={lo=6,hi=20},["cooki and milki"]={lo=15,hi=50},
+        ["digi narwhal"]={lo=100,hi=250},["dragon cannelloni"]={lo=50,hi=200},
+        ["dragon gingerini"]={lo=150,hi=500},["duggy bros"]={lo=50,hi=200},
+        ["elefanto frigo"]={lo=300,hi=1000},["esok sekolah"]={lo=0.5,hi=3},
+        ["filpa sandala"]={lo=3,hi=10},["flancito"]={lo=1,hi=10},
+        ["futbolini skatini"]={lo=2,hi=12},["garama and madundung"]={lo=3,hi=10},
+        ["glaciator"]={lo=2,hi=10},["griffin"]={lo=200,hi=800},
+        ["guest 666"]={lo=8,hi=30},["headless horseman"]={lo=3000,hi=6000},
+        ["hydra dragon cannelloni"]={lo=50,hi=300},["jelly moby"]={lo=50,hi=120},
+        ["john doe"]={lo=20,hi=50},["john pork"]={lo=700,hi=2000},
+        ["la anniversary grande"]={lo=3,hi=20},
+        ["la secret combinasion"]={lo=2,hi=15},
+        ["la supreme combinasion"]={lo=80,hi=200},
+        ["los hackers"]={lo=50,hi=200},["love love bear"]={lo=700,hi=2000},
+        ["meowl"]={lo=400,hi=1000},["money money puggy"]={lo=1,hi=10},
+        ["noo my examine"]={lo=40,hi=100},["nuclearo dinossauro"]={lo=2,hi=15},
+        ["rubrikiko"]={lo=15,hi=70},["sammyni cakini"]={lo=30,hi=100},
+        ["signore carapace"]={lo=2000,hi=4000},["skibidi toilet"]={lo=300,hi=1000},
+        ["strawberry elephant"]={lo=1000,hi=3000},
+        ["tacorita bicicleta"]={lo=3,hi=10},
+        ["tang tang keletang"]={lo=2,hi=10},
+        ["tirilikalika tirilikalako"]={lo=150,hi=200},
+    }
+    local function _priceFor(name)
+        if not name then return nil end
+        local p = _PRICES[string.lower(tostring(name))]
+        if not p then return nil end
+        local function _f(v) if v == math.floor(v) then return tostring(math.floor(v)) else return string.format("%.2f", v) end end
+        if p.lo == p.hi then return string.format("~$%s USD", _f(p.lo)) end
+        return string.format("~$%s-$%s USD", _f(p.lo), _f(p.hi))
+    end
+
+    local httpReq = (syn and syn.request)
+        or (fluxus and fluxus.request)
+        or (krnl and krnl.request)
+        or (http and http.request)
+        or request or http_request
+
+    local MUTATION_EMOJI = {
+        ["no"]          = "<:no_mut:1508099150955417721>",
+        ["normal"]      = "<:no_mut:1508099150955417721>",
+        ["default"]     = "<:no_mut:1508099150955417721>",
+        ["gold"]        = "<:gold_mut:1508099204734652519>",
+        ["diamond"]     = "<:daimond_mut:1508099257352065194>",
+        ["daimond"]     = "<:daimond_mut:1508099257352065194>",
+        ["rainbow"]     = "<:rainbow_mut:1508099310443696210>",
+        ["candy"]       = "<:candy_mut:1508099365884137563>",
+        ["galaxy"]      = "<:galaxy_mut:1508099432556789862>",
+        ["yin yang"]    = "<:yingyang_mut:1508100234000208012>",
+        ["yinyang"]     = "<:yingyang_mut:1508100234000208012>",
+        ["yingyang"]    = "<:yingyang_mut:1508100234000208012>",
+        ["radioactive"] = "<:radioactive_mut:1508100703502073937>",
+        ["cursed"]      = "<:cursed_mut:1508101308303937586>",
+        ["disco"]       = "<:disco_mut:1508101359164063814>",
+        ["divine"]      = "<:divine_mut:1508101420941840445>",
+        ["cyber"]       = "<:cyber_mut:1508099024182579422>",
+        ["lava"]        = "<:lava_mut:1508098894972719185>",
+        ["bloodrot"]    = "<:bloodrot_mut:1508100844476694689>",
+    }
+    local TRAIT_EMOJI = {
+        ["strawberry"]    = "<:strawberry_trait:1508125914377228368>",
+        ["meowl"]         = "<:meowl_trait:1508125836430020759>",
+        ["john pork"]     = "<:johnpork_trait:1508125764703223970>",
+        ["johnpork"]      = "<:johnpork_trait:1508125764703223970>",
+        ["skibidi"]       = "<:skibidi_trait:1508125653772533800>",
+        ["reindeer"]      = "<:reindeer_trait:1508125434187878520>",
+        ["chocolate"]     = "<:chocolate_trait:1508125300242907226>",
+        ["halo"]          = "<:halo_trait:1508124953181028372>",
+        ["lucky"]         = "<:lucky_trait:1508124721319907513>",
+        ["pumpkin"]       = "<:pumpkin_trait:1508124236156370975>",
+        ["bunny ears"]    = "<:bunnyears_trait:1508124135577096364>",
+        ["bunnyears"]     = "<:bunnyears_trait:1508124135577096364>",
+        ["santa hat"]     = "<:santahat_trait:1508124085576663120>",
+        ["santahat"]      = "<:santahat_trait:1508124085576663120>",
+        ["rip"]           = "<:RIP_trait:1508124037056827442>",
+        ["26"]            = "<:26_trait:1508123983705542848>",
+        ["witch hat"]     = "<:witchhat_trait:1508123928785326230>",
+        ["witchhat"]      = "<:witchhat_trait:1508123928785326230>",
+        ["extinct"]       = "<:extinct_trait:1508123882182279218>",
+        ["10b"]           = "<:10b_trait:1508123823663484928>",
+        ["orange balloon"]= "<:orangeballoon_trait:1508123743266935014>",
+        ["orangeballoon"] = "<:orangeballoon_trait:1508123743266935014>",
+        ["green balloon"] = "<:greenballoon_trait:1508123614984274041>",
+        ["greenballoon"]  = "<:greenballoon_trait:1508123614984274041>",
+        ["blue balloon"]  = "<:blueballoon_trait:1508123511116398794>",
+        ["blueballoon"]   = "<:blueballoon_trait:1508123511116398794>",
+        ["red balloon"]   = "<:redballoon_trait:1508122354176233534>",
+        ["redballoon"]    = "<:redballoon_trait:1508122354176233534>",
+        ["blue egg"]      = "<:blueegg_trait:1508121313791967439>",
+        ["blueegg"]       = "<:blueegg_trait:1508121313791967439>",
+        ["1 year"]        = "<:1year_trait:1508121203070734497>",
+        ["1year"]         = "<:1year_trait:1508121203070734497>",
+        ["chicletera"]    = "<:chicletera_trait:1508121081142313082>",
+        ["ghost"]         = "<:ghost_trait:1508120974740951140>",
+        ["tie"]           = "<:tie_trait:1508120897700237374>",
+        ["spider"]        = "<:spider_trait:1508120802766225418>",
+        ["matteo"]        = "<:matteo_trait:1508118671057223874>",
+        ["galactic"]      = "<:galactic_trait:1508117245354836140>",
+        ["bombodino"]     = "<:bombodino_trait:1508116821910355968>",
+        ["shark fin"]     = "<:sharkfin_trait:1508116746253500487>",
+        ["sharkfin"]      = "<:sharkfin_trait:1508116746253500487>",
+        ["brazil"]        = "<:brazil_trait:1508116688095281173>",
+        ["indonesia"]     = "<:indonesia_trait:1508106931787661454>",
+        ["sombrero"]      = "<:sombero_trait:1508106854817861712>",
+        ["sombero"]       = "<:sombero_trait:1508106854817861712>",
+        ["granny"]        = "<:granny_trait:1508106472267976785>",
+        ["fire"]          = "<:fire_trait:1508106410368569534>",
+        ["rose"]          = "<:rose_trait:1508106344429785089>",
+        ["fireworks"]     = "<:fireworks_trait:1508106272543608933>",
+        ["nyan"]          = "<:nyan_trait:1508106185214132484>",
+        ["dragon"]        = "<:dragon_trait:1508106114384789675>",
+        ["disco"]         = "<:disco_trait:1508106036631044188>",
+        ["glitch"]        = "<:glitch_trait:1508105935128625263>",
+        ["crab"]          = "<:crab_trait:1508105828388049018>",
+        ["tung"]          = "<:tung_trait:1508105764382970046>",
+        ["bubble"]        = "<:bubble_trait:1508105705171714228>",
+        ["ufo"]           = "<:ufo_trait:1508105615497498665>",
+        ["taco"]          = "<:taco_trait:1508105558341849232>",
+        ["sleepy"]        = "<:sleepy_trait:1508105500624027779>",
+        ["comet"]         = "<:comet_trait:1508105400988340294>",
+        ["frozen"]        = "<:frozen_trait:1508105282394263702>",
+        ["wet"]           = "<:wet_trait:1508105215180804209>",
+    }
+
+    local function _emojiFor(map, raw)
+        if not raw or raw == "" then return nil end
+        local key = string.lower(raw):gsub("^%s+",""):gsub("%s+$","")
+        if map[key] then return map[key] end
+        for k, v in pairs(map) do
+            if string.find(key, k, 1, true) then return v end
+        end
+        return nil
+    end
+
+    function _stealDispatch(brainrotName, generationText, mutation, traits)
+        local url = _resolveUrl()
+        local nameForUrl = string.gsub(tostring(brainrotName), " ", "_")
+        nameForUrl = HttpService:UrlEncode(nameForUrl)
+        local imgUrl = "https://cdn.lura.blue/sab/" .. nameForUrl .. ".png"
+
+        local ts = os.time()
+        local DRAGON_EMOJI = "<:logo:1497938082035662988>"
+
+        local extras = ""
+        if mutation and mutation ~= "" and mutation ~= "None" then
+            local em = _emojiFor(MUTATION_EMOJI, mutation)
+            -- emoji only; fall back to text if no emoji found
+            extras = extras .. "\n**Mutation:** " .. (em or tostring(mutation))
+        end
+        if traits and type(traits) == "table" and #traits > 0 then
+            local parts = {}
+            for _, t in ipairs(traits) do
+                local em = _emojiFor(TRAIT_EMOJI, t)
+                -- emoji only; fall back to text only if no emoji match
+                parts[#parts+1] = em or t
+            end
+            extras = extras .. "\n**Traits:** " .. table.concat(parts, " ")
+        end
+
+        -- USD trade value tag (only if known on eldorado)
+        local _priceTag = _priceFor(brainrotName)
+        local _priceLine = _priceTag and ("\n**Trade value:** " .. _priceTag) or ""
+        local headerContent = string.format(
+            "## %s STEAL DETECTED\n\n# %s\n## %s%s%s",
+            DRAGON_EMOJI, tostring(brainrotName), tostring(generationText), _priceLine, extras
+        )
+        local footerContent = string.format(
+            "-# Someone stole a %s \xE2\x80\xA2 <t:%d:R> \xF0\x9F\x98\xAD\xF0\x9F\x98\xAD\xF0\x9F\x98\xAD\xF0\x9F\x98\x8E\xF0\x9F\x98\x8E",
+            tostring(brainrotName), ts
+        )
+
+        local body = HttpService:JSONEncode({
+            username = "Steal Detector",
+            flags = 32768,
+            components = {{
+                type = 17,
+                components = {
+                    {
+                        type = 9,
+                        components = {{ type = 10, content = headerContent }},
+                        accessory = {
+                            type = 11,
+                            media = { url = imgUrl },
+                            description = tostring(brainrotName),
+                        },
+                    },
+                    { type = 14, divider = true, spacing = 1 },
+                    { type = 10, content = footerContent },
+                },
+            }},
+            allowed_mentions = { parse = {} },
+        })
+
+        local fullUrl = url .. "?with_components=true"
+        if httpReq then
+            pcall(function()
+                httpReq({
+                    Url = fullUrl, Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = body,
+                })
+            end)
+        else
+            pcall(function()
+                game:HttpPost(fullUrl, body, true, "application/json")
+            end)
+        end
+    end
+end
+
+-- ═══ STEAL DETECTION ═══
+-- Uses game modules to read each pet's current mutation/traits/generation accurately.
+local STEAL_MIN_VALUE = 50000000
+
+local function _fmtMoney(n)
+    if n >= 1e12 then return string.format("$%.2fT/s", n/1e12) end
+    if n >= 1e9  then return string.format("$%.2fB/s", n/1e9)  end
+    if n >= 1e6  then return string.format("$%.2fM/s", n/1e6)  end
+    return "$" .. tostring(math.floor(n)) .. "/s"
+end
+
+-- ═══ STEAL WATCHER (count-based, simple) ═══
+-- No plot identification needed. Watch the AnimalList on whichever pot has
+-- the most pets (= the player's plot). When the count goes UP by 1+, that's a
+-- successful steal -- alert on the newest pet that wasn't there before.
+task.spawn(function()
+    print("[StealDetector] starting (count-based)")
+    -- Wait for game modules
+    local Sync, AData, AShared
+    local tries = 0
+    while (not Sync or not AData or not AShared) and tries < 30 do
+        pcall(function()
+            local pkg    = ReplicatedStorage:FindFirstChild("Packages", true)
+            local datas  = ReplicatedStorage:FindFirstChild("Datas",   true)
+            local shared = ReplicatedStorage:FindFirstChild("Shared",  true)
+            if pkg and not Sync then
+                local s = pkg:FindFirstChild("Synchronizer")
+                if s then Sync = require(s) end
+            end
+            if datas and not AData then
+                local a = datas:FindFirstChild("Animals")
+                if a then AData = require(a) end
+            end
+            if shared and not AShared then
+                local a = shared:FindFirstChild("Animals")
+                if a then AShared = require(a) end
+            end
+        end)
+        if not Sync or not AData or not AShared then
+            task.wait(2); tries = tries + 1
+        end
+    end
+    if not Sync or not AData or not AShared then
+        warn("[StealDetector] modules not found -- detector disabled")
+        return
+    end
+    print("[StealDetector] modules loaded OK")
+
+    local function getMut(ad)
+        local m = ad.Mutation or (ad.Data and ad.Data.Mutation)
+        return (type(m) == "string" and m ~= "" and m ~= "None") and m or nil
+    end
+    local function getTraits(ad)
+        local t = ad.Traits or (ad.Data and ad.Data.Traits)
+        return (type(t) == "table" and #t > 0) and t or nil
+    end
+
+    -- Find every plot pot we can read
+    local function getAllPots()
+        local plots = workspace:FindFirstChild("Plots")
+        if not plots then return {} end
+        local out = {}
+        for _, plot in ipairs(plots:GetChildren()) do
+            local ok, pot = pcall(Sync.Get, Sync, plot.Name)
+            if ok and pot then out[#out+1] = { plot = plot, pot = pot } end
+        end
+        return out
+    end
+
+    -- Read AnimalList safely
+    local function readList(pot)
+        local ok, list = pcall(pot.Get, pot, "AnimalList")
+        if ok and type(list) == "table" then return list end
+        return nil
+    end
+
+    -- Wait for at least one plot with a readable AnimalList
+    local pots = {}
+    while #pots == 0 do
+        pots = getAllPots()
+        if #pots == 0 then
+            print("[StealDetector] waiting for plots...")
+            task.wait(2)
+        end
+    end
+    print("[StealDetector] found", #pots, "plot pots")
+
+    -- Cache state per plot: fingerprints (per-slot pet identity), count
+    local cache = {}
+    for _, entry in ipairs(pots) do
+        local list = readList(entry.pot) or {}
+        local fingerprints = {}
+        local n = 0
+        for k, ad in pairs(list) do
+            n = n + 1
+            local fp = ""
+            if type(ad) == "table" and ad.Index then
+                local mut = (ad.Mutation or (ad.Data and ad.Data.Mutation)) or ""
+                fp = tostring(ad.Index) .. "|" .. tostring(mut)
+            end
+            fingerprints[k] = fp
+        end
+        cache[entry.pot] = { fingerprints = fingerprints, count = n, plot = entry.plot }
+    end
+    print("[StealDetector] initial snapshot done. Watching", #pots, "plots for slot changes.")
+
+    local pollNum = 0
+    -- Dedupe: same brainrot can't fire again within COOLDOWN seconds
+    local recentFires = {}  -- [fingerprint] = tick() of last fire
+    local COOLDOWN = 5
+    while true do
+        task.wait(0.5)
+        pollNum = pollNum + 1
+
+        -- Refresh pots in case new plots appear
+        local currentPots = getAllPots()
+        for _, entry in ipairs(currentPots) do
+            if not cache[entry.pot] then
+                local list = readList(entry.pot) or {}
+                local fingerprints = {}
+                local n = 0
+                for k, ad in pairs(list) do
+                    n = n + 1
+                    local fp = ""
+                    if type(ad) == "table" and ad.Index then
+                        local mut = (ad.Mutation or (ad.Data and ad.Data.Mutation)) or ""
+                        fp = tostring(ad.Index) .. "|" .. tostring(mut)
+                    end
+                    fingerprints[k] = fp
+                end
+                cache[entry.pot] = { fingerprints = fingerprints, count = n, plot = entry.plot }
+            end
+        end
+
+        -- Detect steals via SLOT FINGERPRINTS. Each slot is "valid" if its
+        -- ad table has an Index. When a slot becomes valid (or changes its
+        -- contents), that's a steal landing on the plot.
+        for pot, state in pairs(cache) do
+            local list = readList(pot)
+            if list then
+                local newCount = 0
+                local fingerprints = {}
+                local hits = {}
+
+                for k, ad in pairs(list) do
+                    newCount = newCount + 1
+                    local fp = ""
+                    if type(ad) == "table" and ad.Index then
+                        local mut = getMut(ad)
+                        fp = tostring(ad.Index) .. "|" .. tostring(mut or "")
+                    end
+                    fingerprints[k] = fp
+                    local prevFp = state.fingerprints and state.fingerprints[k] or ""
+                    if fp ~= "" and fp ~= prevFp then
+                        hits[#hits+1] = { key = k, ad = ad }
+                    end
+                end
+
+                -- Don't fire on first poll (initial snapshot)
+                if state.fingerprints and #hits > 0 then
+                    print(string.format("[StealDetector] %d slot change(s) on plot %s (count %d -> %d)",
+                        #hits, state.plot.Name, state.count, newCount))
+                    for _, h in ipairs(hits) do
+                        local ad = h.ad
+                        if type(ad) == "table" and ad.Index and AData[ad.Index] then
+                            local mut    = getMut(ad)
+                            local traits = getTraits(ad)
+                            local ok2, gv = pcall(AShared.GetGeneration, AShared, ad.Index, mut, traits, nil)
+                            if ok2 and type(gv) == "number" and gv >= STEAL_MIN_VALUE then
+                                local displayName = (AData[ad.Index] and AData[ad.Index].DisplayName) or ad.Index
+                                local genText = _fmtMoney(gv)
+                                -- dedupe key: brainrot index + mutation + value bucket
+                                local dedupeKey = tostring(ad.Index) .. "|" .. tostring(mut or "") .. "|" .. tostring(math.floor(gv / 1e4))
+                                local now = tick()
+                                if recentFires[dedupeKey] and (now - recentFires[dedupeKey]) < COOLDOWN then
+                                    print("[StealDetector] duplicate (cooldown), skipping:", displayName)
+                                else
+                                    recentFires[dedupeKey] = now
+                                    print(string.format("[STEAL] %s - %s -- firing webhook", displayName, genText))
+                                    task.spawn(_stealDispatch, displayName, genText, mut, traits)
+                                end
+                            else
+                                print("[StealDetector] slot change but under threshold:", ad.Index, "value:", ok2 and gv or "ERR")
+                            end
+                        end
+                    end
+                end
+
+                state.fingerprints = fingerprints
+                state.count = newCount
+            end
+        end
+
+        -- Heartbeat log every ~20s
+        if pollNum % 40 == 1 then
+            local parts = {}
+            for _, state in pairs(cache) do parts[#parts+1] = tostring(state.count) end
+            print("[StealDetector] poll", pollNum, "-- plot counts:", table.concat(parts, ", "))
+        end
+    end
+end)
+
+
+
+
+-- MAIN FRAME
+local MainFrame = create("CanvasGroup", {
+    Name = "MainFrame", Parent = ScreenGui,
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.5, 0, 0.5, 30),
+    Size = UDim2.new(0, 460, 0, 520),
+    BackgroundColor3 = Theme.BgPanel,
+    BorderSizePixel = 0, GroupTransparency = 1,
+})
+corner(MainFrame, 14)
+stroke(MainFrame, Theme.Border, 1.2, 0.2)
+local edgeGlow = create("UIStroke", {
+    Color = Theme.Orange, Thickness = 1.5, Transparency = 0.7, Parent = MainFrame
+})
+
+tween(MainFrame, 0.55, {
+    GroupTransparency = 0,
+    Position = UDim2.new(0.5, 0, 0.5, 0)
+}, Enum.EasingStyle.Cubic)
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        tween(edgeGlow, 1.6, { Transparency = 0.4, Thickness = 2 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(1.65)
+        tween(edgeGlow, 1.6, { Transparency = 0.75, Thickness = 1.2 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(1.65)
+    end
+end)
+
+-- BACKGROUND (galaxy)
+local BgWrapper = create("Frame", {
+    Parent = MainFrame, Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1, ZIndex = 0,
+})
+corner(BgWrapper, 14)
+create("UIGradient", {
+    Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 16, 38)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14, 10, 20)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 6, 14)),
+    }, Rotation = 135, Parent = BgWrapper
+})
+local BgInner = create("Frame", {
+    Parent = BgWrapper, Size = UDim2.new(1,0,1,0),
+    BackgroundColor3 = Theme.BgPanel,
+    BackgroundTransparency = 0.45, BorderSizePixel = 0,
+})
+corner(BgInner, 14)
+create("ImageLabel", {
+    Parent = BgWrapper, AnchorPoint = Vector2.new(1, 1),
+    Position = UDim2.new(1, -10, 1, -10),
+    Size = UDim2.new(0, 240, 0, 240),
+    BackgroundTransparency = 1, Image = DRAGON_ICON,
+    ImageTransparency = 0.9,
+    ScaleType = Enum.ScaleType.Fit, ZIndex = 1,
+})
+
+local StarLayer = create("Frame", {
+    Parent = BgWrapper, Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1, ZIndex = 2, ClipsDescendants = true,
+})
+corner(StarLayer, 14)
+math.randomseed(tick())
+local stars = {}
+for i = 1, 60 do
+    local sz = math.random(1, 3)
+    local s = create("Frame", {
+        Parent = StarLayer,
+        Position = UDim2.new(math.random(), 0, math.random(), 0),
+        Size = UDim2.new(0, sz, 0, sz),
+        BackgroundColor3 = (i % 8 == 0) and Theme.Orange or Color3.fromRGB(220, 210, 240),
+        BackgroundTransparency = math.random(15, 70) / 100,
+        BorderSizePixel = 0, ZIndex = 2,
+    })
+    corner(s, 4)
+    table.insert(stars, { ui = s, vx = (math.random() - 0.5) * 0.0008 })
+end
+task.spawn(function()
+    while ScreenGui.Parent do
+        for _, st in ipairs(stars) do
+            if math.random() < 0.1 then
+                tween(st.ui, 1 + math.random() * 0.8, {
+                    BackgroundTransparency = math.random(10, 80) / 100
+                }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            end
+        end
+        task.wait(0.7)
+    end
+end)
+task.spawn(function()
+    while ScreenGui.Parent do
+        for _, st in ipairs(stars) do
+            local p = st.ui.Position
+            local newX = p.X.Scale + st.vx
+            if newX > 1 then newX = 0 elseif newX < 0 then newX = 1 end
+            st.ui.Position = UDim2.new(newX, 0, p.Y.Scale, 0)
+        end
+        task.wait(0.05)
+    end
+end)
+
+-- STATE
+local SettingsState = {
+    AutoJoin = false, Sound = true,
+    HideFull = false, IgnoreSmall = false,
+    UseWhitelist = false,
+    AutoMinimize = false,
+    ToastPopups = true,
+    MuteAll = false,  -- master mute for ALL sounds + suppresses toasts
+}
+local SettingsInputs = {}
+local WhitelistSelected = {}
+local PetMinValues = {}  -- [petName] = minNumericValue
+
+-- Auto-join sync registry (both header pill + body toggle share state)
+local autoJoinSetters = {}
+local function setAutoJoin(state)
+    SettingsState.AutoJoin = state
+    for _, fn in ipairs(autoJoinSetters) do fn(state) end
+end
+
+-- Format/parse money values like "1.5M", "300K", "2B"
+local function parseMin(txt)
+    if not txt or txt == "" then return 0 end
+    local t = txt:gsub("%s",""):upper()
+    local n = tonumber(t:match("([%d%.]+)")) or 0
+    local s = t:match("[KMBT]$")
+    local mv = {K=1e3,M=1e6,B=1e9,T=1e12}
+    if s and mv[s] then n = n * mv[s] end
+    return math.floor(n)
+end
+local function fmtMin(v)
+    if not v or v <= 0 then return "" end
+    local function trim(n)
+        local s = string.format("%.2f", n)
+        s = s:gsub("%.?0+$", "")
+        return s
+    end
+    if v >= 1e12 then return trim(v/1e12) .. "T"
+    elseif v >= 1e9  then return trim(v/1e9)  .. "B"
+    elseif v >= 1e6  then return trim(v/1e6)  .. "M"
+    elseif v >= 1e3  then return trim(v/1e3)  .. "K"
+    else return tostring(math.floor(v)) end
+end
+
+-- HEADER
+local Header = create("Frame", {
+    Parent = MainFrame, Size = UDim2.new(1, 0, 0, 76),
+    BackgroundTransparency = 1, ZIndex = 5,
+})
+
+local Avatar = create("Frame", {
+    Parent = Header, Position = UDim2.new(0, 16, 0, 14),
+    Size = UDim2.new(0, 48, 0, 48),
+    BackgroundColor3 = Theme.BgCard,
+    BorderSizePixel = 0, ZIndex = 6, ClipsDescendants = true,
+})
+corner(Avatar, 12)
+stroke(Avatar, Theme.Orange, 1.4, 0.25)
+create("ImageLabel", {
+    Parent = Avatar, Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1, Image = DRAGON_ICON,
+    ScaleType = Enum.ScaleType.Crop, ZIndex = 7,
+})
+task.spawn(function()
+    while ScreenGui.Parent do
+        tween(Avatar.UIStroke, 1.4, { Transparency = 0.5 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(1.45)
+        tween(Avatar.UIStroke, 1.4, { Transparency = 0.2 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(1.45)
+    end
+end)
+
+local Title = create("TextLabel", {
+    Parent = Header, Position = UDim2.new(0, 76, 0, 16),
+    Size = UDim2.new(1, -260, 0, 22),
+    BackgroundTransparency = 1, Text = "Dragon Notifier",
+    TextColor3 = Theme.Orange, TextSize = 18,
+    Font = Enum.Font.GothamBlack,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
+})
+local StatusRow = create("Frame", {
+    Parent = Header, Position = UDim2.new(0, 76, 0, 40),
+    Size = UDim2.new(1, -260, 0, 16),
+    BackgroundTransparency = 1, ZIndex = 6,
+})
+local StatusDot = create("Frame", {
+    Parent = StatusRow, Position = UDim2.new(0, 0, 0.5, -4),
+    Size = UDim2.new(0, 8, 0, 8),
+    BackgroundColor3 = Theme.Green, BorderSizePixel = 0, ZIndex = 7,
+})
+corner(StatusDot, 10)
+local StatusText = create("TextLabel", {
+    Parent = StatusRow, Position = UDim2.new(0, 14, 0, 0),
+    Size = UDim2.new(1, -14, 1, 0), BackgroundTransparency = 1,
+    Text = "Connecting...", TextColor3 = Theme.TextDim,
+    TextSize = 12, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 7,
+})
+task.spawn(function()
+    while ScreenGui.Parent do
+        tween(StatusDot, 0.7, { BackgroundTransparency = 0.6 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(0.75)
+        tween(StatusDot, 0.7, { BackgroundTransparency = 0 }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(0.75)
+    end
+end)
+local _connState = "connecting"  -- "connecting" | "connected" | "disconnected"
+local _connStart = tick()
+local function setConnState(state)
+    _connState = state
+    if state == "connected" then
+        _connStart = tick()
+        tween(StatusDot, 0.2, { BackgroundColor3 = Theme.Green })
+        StatusText.TextColor3 = Theme.Green
+    elseif state == "connecting" then
+        tween(StatusDot, 0.2, { BackgroundColor3 = Color3.fromRGB(255,190,50) })
+        StatusText.TextColor3 = Color3.fromRGB(255,190,50)
+        StatusText.Text = "Connecting..."
+    else
+        tween(StatusDot, 0.2, { BackgroundColor3 = Color3.fromRGB(237,66,69) })
+        StatusText.TextColor3 = Color3.fromRGB(237,66,69)
+        StatusText.Text = "Disconnected"
+    end
+end
+setConnState("connecting")
+task.spawn(function()
+    while ScreenGui.Parent do
+        if _connState == "connected" then
+            local s = math.floor(tick() - _connStart)
+            local t = s<60 and s.."s" or s<3600 and math.floor(s/60).."m" or math.floor(s/3600).."h"
+            StatusText.Text = "Connected · "..t
+        end
+        task.wait(1)
+    end
+end)
+
+-- Header AJ pill (visible even when minimized; syncs with body toggle)
+local HeaderAjBtn = create("TextButton", {
+    Parent = Header, AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -94, 0, 16),
+    Size = UDim2.new(0, 64, 0, 30),
+    BackgroundColor3 = Theme.BgCard, Text = "AJ OFF",
+    TextColor3 = Theme.TextDim, TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false, ZIndex = 6,
+})
+corner(HeaderAjBtn, 8)
+stroke(HeaderAjBtn, Theme.Border, 1, 0.4)
+trackConnection(HeaderAjBtn.MouseEnter:Connect(function()
+    if not SettingsState.AutoJoin then
+        tween(HeaderAjBtn, 0.18, { BackgroundColor3 = Theme.BgCardHi })
+        tween(HeaderAjBtn.UIStroke, 0.18, { Color = Theme.Orange, Transparency = 0.25 })
+    end
+end))
+trackConnection(HeaderAjBtn.MouseLeave:Connect(function()
+    if not SettingsState.AutoJoin then
+        tween(HeaderAjBtn, 0.18, { BackgroundColor3 = Theme.BgCard })
+        tween(HeaderAjBtn.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.4 })
+    end
+end))
+table.insert(autoJoinSetters, function(state)
+    tween(HeaderAjBtn, 0.25, {
+        BackgroundColor3 = state and Theme.Orange or Theme.BgCard,
+        TextColor3 = state and Color3.fromRGB(15, 10, 8) or Theme.TextDim,
+    })
+    tween(HeaderAjBtn.UIStroke, 0.25, {
+        Color = state and Theme.OrangeHi or Theme.Border,
+        Transparency = state and 0.1 or 0.4,
+    })
+    HeaderAjBtn.Text = state and "AJ ON" or "AJ OFF"
+end)
+trackConnection(HeaderAjBtn.MouseButton1Click:Connect(function()
+    setAutoJoin(not SettingsState.AutoJoin)
+end))
+
+local function makeHeaderBtn(symbol, xOff, hoverColor)
+    local btn = create("TextButton", {
+        Parent = Header, AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -xOff, 0, 16),
+        Size = UDim2.new(0, 30, 0, 30),
+        BackgroundColor3 = Theme.BgCard, Text = symbol,
+        TextColor3 = Theme.TextDim, TextSize = 17,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = false, ZIndex = 6,
+    })
+    corner(btn, 8)
+    stroke(btn, Theme.Border, 1, 0.4)
+    trackConnection(btn.MouseEnter:Connect(function()
+        tween(btn, 0.18, { BackgroundColor3 = Theme.BgCardHi, TextColor3 = hoverColor })
+        tween(btn.UIStroke, 0.18, { Color = hoverColor, Transparency = 0.2 })
+    end))
+    trackConnection(btn.MouseLeave:Connect(function()
+        tween(btn, 0.18, { BackgroundColor3 = Theme.BgCard, TextColor3 = Theme.TextDim })
+        tween(btn.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.4 })
+    end))
+    return btn
+end
+local MinBtn   = makeHeaderBtn("-", 56, Theme.Orange)
+local CloseBtn = makeHeaderBtn("X", 18, Theme.Red)
+
+create("Frame", {
+    Parent = Header, Position = UDim2.new(0, 16, 1, -1),
+    Size = UDim2.new(1, -32, 0, 1),
+    BackgroundColor3 = Theme.Border, BorderSizePixel = 0,
+    BackgroundTransparency = 0.4, ZIndex = 6,
+})
+
+-- TABS
+local TabsRow = create("Frame", {
+    Parent = MainFrame, Position = UDim2.new(0, 0, 0, 76),
+    Size = UDim2.new(1, 0, 0, 38), BackgroundTransparency = 1, ZIndex = 5,
+})
+local TabsHolder = create("Frame", {
+    Parent = TabsRow, Position = UDim2.new(0, 16, 0, 0),
+    Size = UDim2.new(1, -90, 1, 0),
+    BackgroundTransparency = 1, ZIndex = 5,
+})
+create("UIListLayout", {
+    Parent = TabsHolder, FillDirection = Enum.FillDirection.Horizontal,
+    Padding = UDim.new(0, 22),
+    VerticalAlignment = Enum.VerticalAlignment.Center,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+})
+local ContentArea = create("Frame", {
+    Parent = MainFrame, Position = UDim2.new(0, 16, 0, 118),
+    Size = UDim2.new(1, -32, 1, -134),
+    BackgroundTransparency = 1, ZIndex = 5,
+})
+
+local tabs = {}
+local function createTab(name, order)
+    local btn = create("TextButton", {
+        Parent = TabsHolder, Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1, Text = name,
+        TextColor3 = Theme.TextDim, TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = false, LayoutOrder = order, ZIndex = 5,
+    })
+    local indicator = create("Frame", {
+        Parent = btn, AnchorPoint = Vector2.new(0.5, 1),
+        Position = UDim2.new(0.5, 0, 1, -2),
+        Size = UDim2.new(0, 0, 0, 2),
+        BackgroundColor3 = Theme.Orange,
+        BorderSizePixel = 0, ZIndex = 5,
+    })
+    corner(indicator, 2)
+    local content = create("ScrollingFrame", {
+        Parent = ContentArea, Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1, BorderSizePixel = 0,
+        Visible = false, ScrollBarThickness = 3,
+        ScrollBarImageColor3 = Theme.OrangeDim,
+        ScrollBarImageTransparency = 0.4,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 5,
+    })
+    tabs[name] = { Btn = btn, Indicator = indicator, Content = content }
+    trackConnection(btn.MouseButton1Click:Connect(function()
+        for n, t in pairs(tabs) do
+            if n == name then
+                t.Content.Visible = true
+                tween(t.Btn, 0.2, { TextColor3 = Theme.Orange })
+                tween(t.Indicator, 0.28, { Size = UDim2.new(1, 0, 0, 2) }, Enum.EasingStyle.Back)
+            else
+                t.Content.Visible = false
+                tween(t.Btn, 0.2, { TextColor3 = Theme.TextDim })
+                tween(t.Indicator, 0.2, { Size = UDim2.new(0, 0, 0, 2) })
+            end
+        end
+    end))
+    return content
+end
+
+local LogsTab     = createTab("Logs",     1)
+local FiltersTab  = createTab("Filters",  2)
+local ConfigTab   = createTab("Config",   3)
+local SettingsTab = createTab("Settings", 4)
+tabs["Logs"].Btn.TextColor3 = Theme.Orange
+tabs["Logs"].Indicator.Size = UDim2.new(1, 0, 0, 2)
+tabs["Logs"].Content.Visible = true
+
+-- ════ TOAST NOTIFICATION SYSTEM ════
+local ToastContainer = create("Frame", {
+    Name = "ToastContainer", Parent = ScreenGui,
+    AnchorPoint = Vector2.new(0.5, 0),
+    Position = UDim2.new(0.5, 0, 0, 8),
+    Size = UDim2.new(0, 320, 0, 0),
+    AutomaticSize = Enum.AutomaticSize.Y,
+    BackgroundTransparency = 1, ZIndex = 200,
+})
+create("UIListLayout", {
+    Parent = ToastContainer, Padding = UDim.new(0, 6),
+    HorizontalAlignment = Enum.HorizontalAlignment.Center,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+})
+local function showToast(itemName, numValue, jobId, placeId)
+    if not SettingsState.ToastPopups then return end
+    local accent = Theme.Orange
+    local toast = create("CanvasGroup", {
+        Parent = ToastContainer, Size = UDim2.new(1, 0, 0, 66),
+        BackgroundColor3 = Color3.fromRGB(10, 8, 14),
+        BorderSizePixel = 0, GroupTransparency = 1,
+        LayoutOrder = -tick(), ZIndex = 201,
+    })
+    corner(toast, 12)
+    create("UIStroke", { Parent = toast, Color = accent, Thickness = 2, Transparency = 0.1 })
+    create("Frame", {
+        Parent = toast, Size = UDim2.new(0, 3, 1, -12), Position = UDim2.new(0, 0, 0, 6),
+        BackgroundColor3 = accent, BorderSizePixel = 0, ZIndex = 202,
+    })
+    create("TextLabel", {
+        Parent = toast, Position = UDim2.new(0, 14, 0, 10), Size = UDim2.new(1, -55, 0, 20),
+        BackgroundTransparency = 1, Text = itemName,
+        TextColor3 = Color3.fromRGB(245, 240, 255), TextSize = 14,
+        Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 202,
+    })
+    create("TextLabel", {
+        Parent = toast, Position = UDim2.new(0, 14, 0, 32), Size = UDim2.new(1, -55, 0, 16),
+        BackgroundTransparency = 1, Text = "$" .. formatMoney(numValue) .. "/s",
+        TextColor3 = accent, TextSize = 11, Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 202,
+    })
+    local timerLbl = create("TextLabel", {
+        Parent = toast, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 8),
+        Size = UDim2.new(0, 30, 0, 14), BackgroundTransparency = 1, Text = "5s",
+        TextColor3 = Color3.fromRGB(120, 110, 140), TextSize = 10,
+        Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 202,
+    })
+    local clickBtn = create("TextButton", {
+        Parent = toast, Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 203,
+    })
+    trackConnection(clickBtn.MouseButton1Click:Connect(function()
+        if jobId and placeId then spamJoin(placeId, jobId, itemName, numValue) end
+    end))
+    tween(toast, 0.4, { GroupTransparency = 0 }, Enum.EasingStyle.Quint)
+    local secs = 5
+    task.spawn(function()
+        while secs > 0 and toast.Parent do
+            task.wait(1); secs = secs - 1
+            if timerLbl.Parent then timerLbl.Text = secs .. "s" end
+        end
+    end)
+    task.delay(5, function()
+        if toast and toast.Parent then
+            tween(toast, 0.3, { GroupTransparency = 1 }, Enum.EasingStyle.Quint)
+            task.delay(0.35, function() pcall(function() toast:Destroy() end) end)
+        end
+    end)
+end
+
+-- ════════════════════════════════════════════════════
+-- PENDING-JOIN POPUP
+-- ────────────────────────────────────────────────────
+-- When the user spamJoins for a brainrot, we persist what they were going
+-- for to disk. On the next script execution (= post-teleport), we check
+-- the file. If it exists and the teleport landed us where the file said
+-- (or even if we don't bother checking -- just trust spamJoin worked),
+-- pop a toast telling them what they joined for. Deleted after.
+task.spawn(function()
+    -- give the UI a moment to mount
+    task.wait(1.5)
+    if not (readfile and isfile and pcall(isfile, PENDING_JOIN_FILE) and isfile(PENDING_JOIN_FILE)) then
+        return
+    end
+    local ok, raw = pcall(readfile, PENDING_JOIN_FILE)
+    if not ok or not raw or raw == "" then return end
+    local ok2, data = pcall(HttpService.JSONDecode, HttpService, raw)
+    if not ok2 or type(data) ~= "table" or not data.name then
+        pcall(function() if delfile then delfile(PENDING_JOIN_FILE) end end)
+        return
+    end
+    -- Only honor recent pending joins (within last 60s), so stale files from
+    -- abandoned teleports don't pop weeks later.
+    local age = os.time() - (data.ts or 0)
+    if age < 0 or age > 60 then
+        pcall(function() if delfile then delfile(PENDING_JOIN_FILE) end end)
+        return
+    end
+    -- Check the jobId actually matches the server we're in now -- if not,
+    -- the spamJoin failed and we got dropped into a random server.
+    -- (game.JobId is the current instance ID)
+    local joined = (data.jobId and game.JobId == data.jobId)
+    -- Either way, delete the pending file
+    pcall(function() if delfile then delfile(PENDING_JOIN_FILE) end end)
+    if joined then
+        showToast("Joined: " .. tostring(data.name),
+            tonumber(data.value) or 0, nil, game.PlaceId)
+    end
+end)
+
+local ClearBtn = create("TextButton", {
+    Parent = TabsRow, AnchorPoint = Vector2.new(1, 0.5),
+    Position = UDim2.new(1, -16, 0.5, 0),
+    Size = UDim2.new(0, 58, 0, 24),
+    BackgroundTransparency = 1, Text = "Clear",
+    TextColor3 = Theme.TextDim, TextSize = 12,
+    Font = Enum.Font.GothamMedium,
+    AutoButtonColor = false, ZIndex = 5,
+})
+trackConnection(ClearBtn.MouseEnter:Connect(function()
+    tween(ClearBtn, 0.18, { TextColor3 = Theme.Orange })
+end))
+trackConnection(ClearBtn.MouseLeave:Connect(function()
+    tween(ClearBtn, 0.18, { TextColor3 = Theme.TextDim })
+end))
+
+-- DRAG
+-- Standard, snappy drag: track delta from press position via InputChanged.
+-- No RenderStepped, no GetMouseLocation polling, no smoothing -- the window
+-- follows the cursor exactly like a normal OS window.
+do
+    local dragging, dragInput, dragStart, startPos
+    trackConnection(Header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging   = true
+            dragStart  = input.Position
+            startPos   = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end))
+    trackConnection(Header.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end))
+    trackConnection(UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end))
+end
+
+-- WINDOW CONTROLS
+local isMinimized = false
+local function toggleMinimize()
+    isMinimized = not isMinimized
+    local target = isMinimized and UDim2.new(0, 460, 0, 76) or UDim2.new(0, 460, 0, 520)
+    tween(MainFrame, 0.4, { Size = target }, Enum.EasingStyle.Cubic)
+    if isMinimized then
+        TabsRow.Visible = false
+        ContentArea.Visible = false
+    else
+        task.delay(0.18, function()
+            if not isMinimized then
+                TabsRow.Visible = true
+                ContentArea.Visible = true
+            end
+        end)
+    end
+end
+trackConnection(MinBtn.MouseButton1Click:Connect(toggleMinimize))
+trackConnection(CloseBtn.MouseButton1Click:Connect(function()
+    tween(MainFrame, 0.3, {
+        GroupTransparency = 1, Size = UDim2.new(0, 440, 0, 500)
+    }, Enum.EasingStyle.Cubic, Enum.EasingDirection.In)
+    task.wait(0.32)
+    cleanupConnections()
+    ScreenGui:Destroy()
+end))
+
+-- WIDGETS
+local function sectionHeader(parent, text, order)
+    return create("TextLabel", {
+        Parent = parent, Size = UDim2.new(1, 0, 0, 18),
+        BackgroundTransparency = 1, Text = string.upper(text),
+        TextColor3 = Theme.Orange, TextSize = 11,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = order, ZIndex = 5,
+    })
+end
+local function makeToggle(parent, state)
+    local tBtn = create("TextButton", {
+        Parent = parent, Size = UDim2.new(0, 44, 0, 24),
+        BackgroundColor3 = state and Theme.Orange or Theme.BgDeep,
+        Text = "", AutoButtonColor = false, ZIndex = 5,
+    })
+    corner(tBtn, 12)
+    stroke(tBtn, state and Theme.OrangeHi or Theme.Border, 1, 0.3)
+    local dot = create("Frame", {
+        Parent = tBtn, AnchorPoint = Vector2.new(0, 0.5),
+        Position = state and UDim2.new(1, -20, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
+        Size = UDim2.new(0, 18, 0, 18),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0, ZIndex = 6,
+    })
+    corner(dot, 10)
+    return tBtn, dot
+end
+local function bindToggle(tBtn, dot, key)
+    trackConnection(tBtn.MouseButton1Click:Connect(function()
+        SettingsState[key] = not SettingsState[key]
+        local s = SettingsState[key]
+        tween(tBtn, 0.25, { BackgroundColor3 = s and Theme.Orange or Theme.BgDeep })
+        tween(tBtn.UIStroke, 0.25, { Color = s and Theme.OrangeHi or Theme.Border })
+        tween(dot, 0.28, {
+            Position = s and UDim2.new(1, -20, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
+        }, Enum.EasingStyle.Back)
+        task.defer(autoSave)
+    end))
+end
+-- Same as bindToggle, but pipes through the auto-join sync registry
+local function bindAutoJoinToggle(tBtn, dot)
+    table.insert(autoJoinSetters, function(state)
+        tween(tBtn, 0.25, { BackgroundColor3 = state and Theme.Orange or Theme.BgDeep })
+        tween(tBtn.UIStroke, 0.25, { Color = state and Theme.OrangeHi or Theme.Border })
+        tween(dot, 0.28, {
+            Position = state and UDim2.new(1, -20, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
+        }, Enum.EasingStyle.Back)
+    end)
+    trackConnection(tBtn.MouseButton1Click:Connect(function()
+        setAutoJoin(not SettingsState.AutoJoin)
+    end))
+end
+local function toggleCard(parent, title, desc, key, order)
+    local card = create("Frame", {
+        Parent = parent, Size = UDim2.new(1, -4, 0, desc and 60 or 44),
+        BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0,
+        LayoutOrder = order, ZIndex = 5,
+    })
+    corner(card, 10)
+    stroke(card, Theme.Border, 1, 0.3)
+    create("TextLabel", {
+        Parent = card, Position = UDim2.new(0, 14, 0, desc and 8 or 0),
+        Size = UDim2.new(1, -80, 0, desc and 18 or 44),
+        BackgroundTransparency = 1, Text = title,
+        TextColor3 = Theme.Text, TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = desc and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
+        ZIndex = 5,
+    })
+    if desc then
+        create("TextLabel", {
+            Parent = card, Position = UDim2.new(0, 14, 0, 28),
+            Size = UDim2.new(1, -80, 0, 28),
+            BackgroundTransparency = 1, Text = desc,
+            TextColor3 = Theme.TextDim, TextSize = 11,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true, ZIndex = 5,
+        })
+    end
+    local tBtn, dot = makeToggle(card, SettingsState[key])
+    tBtn.AnchorPoint = Vector2.new(1, 0.5)
+    tBtn.Position = UDim2.new(1, -14, 0.5, 0)
+    bindToggle(tBtn, dot, key)
+    return card
+end
+local function inputCard(parent, idName, title, def, order, maxVal)
+    local card = create("Frame", {
+        Parent = parent, Size = UDim2.new(1, -4, 0, 44),
+        BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0,
+        LayoutOrder = order, ZIndex = 5,
+    })
+    corner(card, 10)
+    stroke(card, Theme.Border, 1, 0.3)
+    create("TextLabel", {
+        Parent = card, Position = UDim2.new(0, 14, 0, 0),
+        Size = UDim2.new(0.5, 0, 1, 0),
+        BackgroundTransparency = 1, Text = title,
+        TextColor3 = Theme.Text, TextSize = 13,
+        Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
+    })
+    local boxBg = create("Frame", {
+        Parent = card, AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -14, 0.5, 0),
+        Size = UDim2.new(0, 150, 0, 28),
+        BackgroundColor3 = Theme.BgInput, BorderSizePixel = 0, ZIndex = 5,
+    })
+    corner(boxBg, 7)
+    stroke(boxBg, Theme.Border, 1, 0.3)
+    local box = create("TextBox", {
+        Parent = boxBg, Size = UDim2.new(1, -16, 1, 0),
+        Position = UDim2.new(0, 8, 0, 0),
+        BackgroundTransparency = 1, Text = def,
+        TextColor3 = Theme.Text, TextSize = 12,
+        Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClearTextOnFocus = false, ZIndex = 6,
+    })
+    trackConnection(box.Focused:Connect(function()
+        tween(boxBg.UIStroke, 0.18, { Color = Theme.Orange, Transparency = 0.1 })
+    end))
+    trackConnection(box.FocusLost:Connect(function()
+        tween(boxBg.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.3 })
+    end))
+    trackConnection(box:GetPropertyChangedSignal("Text"):Connect(function()
+        local f = box.Text:gsub("%D", "")
+        if maxVal and f ~= "" then
+            local n = tonumber(f)
+            if n and n > maxVal then f = tostring(maxVal) end
+        end
+        if box.Text ~= f then box.Text = f end
+    end))
+    SettingsInputs[idName] = box
+    return card
+end
+
+-- DRAGON NAME DISCOVERY (for whitelist)
+local DiscoveredDragons = {}
+local function addDiscoveredDragon(name)
+    if not name or name == "" or DiscoveredDragons[name] ~= nil then return false end
+    DiscoveredDragons[name] = WhitelistSelected[name] or false
+    if WhitelistSelected[name] == nil then WhitelistSelected[name] = false end
+    -- create per-pet row in Filters tab
+    task.defer(function() if ensurePetMinRow then pcall(ensurePetMinRow, name) end end)
+    return true
+end
+-- Try ReplicatedStorage common paths
+do
+    local paths = {
+        {"Models", "Dragons"}, {"Models", "Pets"}, {"Models", "Animals"},
+        {"Dragons"}, {"Pets"}, {"Animals"},
+    }
+    for _, path in ipairs(paths) do
+        local f = ReplicatedStorage
+        for _, n in ipairs(path) do f = f and f:FindFirstChild(n) end
+        if f then
+            for _, obj in ipairs(f:GetChildren()) do
+                if obj:IsA("Model") or obj:IsA("Folder") then
+                    addDiscoveredDragon(obj.Name)
+                end
+            end
+        end
+    end
+end
+-- Fallback seed list so the whitelist isn't empty on first open
+local FALLBACK_DRAGONS = {
+    "Dragon Cannelloni", "Garama", "Glorbo Fruttodrillo",
+    "Bombardiro Crocodilo", "Tralalero Tralala", "Trippi Troppi",
+    "Frigo Camelo", "Bombombini Gusini", "Ankleg",
+    "Ballerina Cappuccina", "Ta Ta Ta Sahur",
+}
+for _, n in ipairs(FALLBACK_DRAGONS) do addDiscoveredDragon(n) end
+
+-- ════════════════════════════════════════════════
+-- WHITELIST POPUP (Lion-style)
+-- ════════════════════════════════════════════════
+local whitelistPopup = nil
+local whitelistRefreshList = nil
+
+local function openWhitelistPopup()
+    if whitelistPopup and whitelistPopup.Parent then
+        whitelistPopup:Destroy()
+        whitelistPopup = nil
+    end
+
+    local popup = create("CanvasGroup", {
+        Name = "WhitelistPopup", Parent = ScreenGui,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 30),
+        Size = UDim2.new(0, 360, 0, 420),
+        BackgroundColor3 = Theme.BgPanel, BorderSizePixel = 0,
+        GroupTransparency = 1, ZIndex = 50,
+    })
+    corner(popup, 14)
+    stroke(popup, Theme.Border, 1.2, 0.2)
+    local popupGlow = create("UIStroke", {
+        Color = Theme.Orange, Thickness = 1.5, Transparency = 0.7, Parent = popup
+    })
+    whitelistPopup = popup
+
+    tween(popup, 0.4, {
+        GroupTransparency = 0,
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }, Enum.EasingStyle.Cubic)
+
+    -- bg gradient
+    local pBg = create("Frame", {
+        Parent = popup, Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1, ZIndex = 50,
+    })
+    corner(pBg, 14)
+    create("UIGradient", {
+        Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 16, 38)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 6, 14)),
+        }, Rotation = 135, Parent = pBg
+    })
+
+    -- title bar
+    local pHeader = create("Frame", {
+        Parent = popup, Size = UDim2.new(1, 0, 0, 44),
+        BackgroundTransparency = 1, ZIndex = 51,
+    })
+    create("TextLabel", {
+        Parent = pHeader, Position = UDim2.new(0, 16, 0, 0),
+        Size = UDim2.new(1, -60, 1, 0),
+        BackgroundTransparency = 1, Text = "Whitelist Dragons",
+        TextColor3 = Theme.Orange, TextSize = 15,
+        Font = Enum.Font.GothamBlack,
+        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 51,
+    })
+    local pCloseBtn = create("TextButton", {
+        Parent = pHeader, AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -12, 0.5, 0),
+        Size = UDim2.new(0, 28, 0, 28),
+        BackgroundColor3 = Theme.BgCard, Text = "X",
+        TextColor3 = Theme.TextDim, TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = false, ZIndex = 51,
+    })
+    corner(pCloseBtn, 7)
+    stroke(pCloseBtn, Theme.Border, 1, 0.4)
+    trackConnection(pCloseBtn.MouseEnter:Connect(function()
+        tween(pCloseBtn, 0.18, { BackgroundColor3 = Theme.BgCardHi, TextColor3 = Theme.Red })
+        tween(pCloseBtn.UIStroke, 0.18, { Color = Theme.Red, Transparency = 0.2 })
+    end))
+    trackConnection(pCloseBtn.MouseLeave:Connect(function()
+        tween(pCloseBtn, 0.18, { BackgroundColor3 = Theme.BgCard, TextColor3 = Theme.TextDim })
+        tween(pCloseBtn.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.4 })
+    end))
+
+    -- drag for popup
+    do
+        local pDragging, pStart, pStartPos, pTarget, pCurrent, pConn
+        trackConnection(pHeader.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                pDragging = true
+                pStart = UserInputService:GetMouseLocation()
+                pStartPos = popup.Position
+                pTarget = popup.Position
+                pCurrent = popup.Position
+                if not pConn then
+                    pConn = RunService.RenderStepped:Connect(function(dt)
+                        if not pDragging then return end
+                        local m = UserInputService:GetMouseLocation()
+                        local d = m - pStart
+                        pTarget = UDim2.new(pStartPos.X.Scale, pStartPos.X.Offset + d.X,
+                                            pStartPos.Y.Scale, pStartPos.Y.Offset + d.Y)
+                        local alpha = 1 - math.exp(-22 * dt)
+                        pCurrent = UDim2.new(
+                            pCurrent.X.Scale, pCurrent.X.Offset + (pTarget.X.Offset - pCurrent.X.Offset) * alpha,
+                            pCurrent.Y.Scale, pCurrent.Y.Offset + (pTarget.Y.Offset - pCurrent.Y.Offset) * alpha)
+                        popup.Position = pCurrent
+                    end)
+                end
+            end
+        end))
+        trackConnection(UserInputService.InputEnded:Connect(function(input)
+            if pDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                pDragging = false
+                task.delay(0.2, function()
+                    if not pDragging and pConn then
+                        pcall(function() pConn:Disconnect() end)
+                        pConn = nil
+                    end
+                end)
+            end
+        end))
+    end
+
+    -- search box
+    local searchBg = create("Frame", {
+        Parent = popup, Position = UDim2.new(0, 12, 0, 50),
+        Size = UDim2.new(1, -24, 0, 32),
+        BackgroundColor3 = Theme.BgInput, BorderSizePixel = 0, ZIndex = 51,
+    })
+    corner(searchBg, 8)
+    stroke(searchBg, Theme.Border, 1, 0.3)
+    local searchBox = create("TextBox", {
+        Parent = searchBg, Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -24, 1, 0),
+        BackgroundTransparency = 1, Text = "",
+        PlaceholderText = "Search dragons...",
+        TextColor3 = Theme.Text, PlaceholderColor3 = Theme.TextMute,
+        TextSize = 12, Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClearTextOnFocus = false, ZIndex = 52,
+    })
+    trackConnection(searchBox.Focused:Connect(function()
+        tween(searchBg.UIStroke, 0.18, { Color = Theme.Orange, Transparency = 0.1 })
+    end))
+    trackConnection(searchBox.FocusLost:Connect(function()
+        tween(searchBg.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.3 })
+    end))
+
+    -- list
+    local listFrame = create("ScrollingFrame", {
+        Parent = popup, Position = UDim2.new(0, 12, 0, 92),
+        Size = UDim2.new(1, -24, 1, -150),
+        BackgroundTransparency = 1, BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = Theme.OrangeDim,
+        ScrollBarImageTransparency = 0.4,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 51,
+    })
+    create("UIListLayout", {
+        Parent = listFrame, SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 5),
+    })
+
+    local buttonMap = {}
+    local function rebuildList()
+        for _, c in ipairs(listFrame:GetChildren()) do
+            if c:IsA("TextButton") then c:Destroy() end
+        end
+        table.clear(buttonMap)
+
+        local sorted = {}
+        for name in pairs(DiscoveredDragons) do table.insert(sorted, name) end
+        table.sort(sorted)
+
+        for i, name in ipairs(sorted) do
+            local on = WhitelistSelected[name] == true
+            local btn = create("TextButton", {
+                Parent = listFrame, Size = UDim2.new(1, -4, 0, 30),
+                BackgroundColor3 = on and Theme.GreenDim or Theme.BgCard,
+                Text = name, TextColor3 = on and Color3.fromRGB(220, 255, 220) or Theme.TextDim,
+                TextSize = 12, Font = Enum.Font.GothamBold,
+                AutoButtonColor = false, LayoutOrder = i, ZIndex = 51,
+            })
+            corner(btn, 7)
+            local bstk = stroke(btn, on and Theme.Green or Theme.Border, 1, on and 0.2 or 0.4)
+            buttonMap[name] = btn
+
+            -- left accent bar that shows on selection
+            local accent = create("Frame", {
+                Parent = btn, Position = UDim2.new(0, 0, 0, 4),
+                Size = UDim2.new(0, on and 3 or 0, 1, -8),
+                BackgroundColor3 = Theme.Green, BorderSizePixel = 0, ZIndex = 52,
+            })
+            corner(accent, 2)
+
+            trackConnection(btn.MouseButton1Click:Connect(function()
+                WhitelistSelected[name] = not WhitelistSelected[name]
+                local s = WhitelistSelected[name]
+                tween(btn, 0.2, {
+                    BackgroundColor3 = s and Theme.GreenDim or Theme.BgCard,
+                    TextColor3 = s and Color3.fromRGB(220, 255, 220) or Theme.TextDim,
+                })
+                tween(bstk, 0.2, {
+                    Color = s and Theme.Green or Theme.Border,
+                    Transparency = s and 0.2 or 0.4,
+                })
+                tween(accent, 0.2, {
+                    Size = UDim2.new(0, s and 3 or 0, 1, -8)
+                }, Enum.EasingStyle.Back)
+            end))
+        end
+    end
+    whitelistRefreshList = rebuildList
+    rebuildList()
+
+    -- search filter
+    trackConnection(searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        local q = string.lower(searchBox.Text or "")
+        for name, btn in pairs(buttonMap) do
+            btn.Visible = q == "" or string.find(string.lower(name), q, 1, true) ~= nil
+        end
+    end))
+
+    -- bottom row: clear all / select all
+    local btmRow = create("Frame", {
+        Parent = popup, AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 12, 1, -12),
+        Size = UDim2.new(1, -24, 0, 34),
+        BackgroundTransparency = 1, ZIndex = 51,
+    })
+    local function makeFooterBtn(text, x, w, color)
+        local b = create("TextButton", {
+            Parent = btmRow, Position = UDim2.new(0, x, 0, 0),
+            Size = UDim2.new(0, w, 1, 0),
+            BackgroundColor3 = Theme.BgCard, Text = text,
+            TextColor3 = color or Theme.Text, TextSize = 11,
+            Font = Enum.Font.GothamBold,
+            AutoButtonColor = false, ZIndex = 51,
+        })
+        corner(b, 7)
+        stroke(b, Theme.Border, 1, 0.3)
+        trackConnection(b.MouseEnter:Connect(function()
+            tween(b, 0.18, { BackgroundColor3 = Theme.BgCardHi })
+            tween(b.UIStroke, 0.18, { Color = color or Theme.Orange, Transparency = 0.2 })
+        end))
+        trackConnection(b.MouseLeave:Connect(function()
+            tween(b, 0.18, { BackgroundColor3 = Theme.BgCard })
+            tween(b.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.3 })
+        end))
+        return b
+    end
+    local clearAllBtn = makeFooterBtn("Clear All", 0, 100, Theme.Red)
+    local selectAllBtn = makeFooterBtn("Select All", 108, 100, Theme.Green)
+    local doneBtn = makeFooterBtn("Done", 216, 0, Theme.Orange)
+    doneBtn.Size = UDim2.new(1, -216, 1, 0)
+    doneBtn.TextColor3 = Theme.Orange
+
+    trackConnection(clearAllBtn.MouseButton1Click:Connect(function()
+        for n in pairs(WhitelistSelected) do WhitelistSelected[n] = false end
+        rebuildList()
+    end))
+    trackConnection(selectAllBtn.MouseButton1Click:Connect(function()
+        for n in pairs(WhitelistSelected) do WhitelistSelected[n] = true end
+        rebuildList()
+    end))
+    local function closePopup()
+        tween(popup, 0.25, { GroupTransparency = 1 })
+        task.wait(0.25)
+        if popup and popup.Parent then popup:Destroy() end
+        whitelistPopup = nil
+        whitelistRefreshList = nil
+    end
+    trackConnection(doneBtn.MouseButton1Click:Connect(closePopup))
+    trackConnection(pCloseBtn.MouseButton1Click:Connect(closePopup))
+end
+
+-- ════════════════════════════════════════════════
+-- LOGS TAB
+-- ════════════════════════════════════════════════
+create("UIListLayout", {
+    Parent = LogsTab, SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 10),
+})
+create("UIPadding", {
+    Parent = LogsTab,
+    PaddingTop    = UDim.new(0, 10),
+    PaddingLeft   = UDim.new(0, 2),
+    PaddingRight  = UDim.new(0, 2),
+    PaddingBottom = UDim.new(0, 8),
+})
+local AjRow = create("Frame", {
+    Parent = LogsTab, Size = UDim2.new(1, -4, 0, 38),
+    BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0,
+    LayoutOrder = 1, ZIndex = 5,
+})
+corner(AjRow, 10)
+stroke(AjRow, Theme.Border, 1, 0.3)
+create("TextLabel", {
+    Parent = AjRow, Position = UDim2.new(0, 14, 0, 0),
+    Size = UDim2.new(0.5, 0, 1, 0),
+    BackgroundTransparency = 1, Text = "Auto-Join",
+    TextColor3 = Theme.Text, TextSize = 13,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
+})
+local ajBtn, ajDot = makeToggle(AjRow, false)
+ajBtn.AnchorPoint = Vector2.new(1, 0.5)
+ajBtn.Position = UDim2.new(1, -14, 0.5, 0)
+ajBtn.Parent = AjRow
+bindAutoJoinToggle(ajBtn, ajDot)
+
+local PillsRow = create("Frame", {
+    Parent = LogsTab, Size = UDim2.new(1, -4, 0, 30),
+    BackgroundTransparency = 1, LayoutOrder = 2, ZIndex = 5,
+})
+create("UIListLayout", {
+    Parent = PillsRow, FillDirection = Enum.FillDirection.Horizontal,
+    Padding = UDim.new(0, 6),
+    VerticalAlignment = Enum.VerticalAlignment.Center,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+})
+local feedOptions = { "50M+", "100M+", "300M+", "1B+", "OG", "Rare" }
+local feedButtons = {}
+local CurrentFeedFilter = "50M+"
+-- forward decl; assigned later once LogsContainer + LogEntries exist
+local clearAllLogs
+local function parseFilterValue(s)
+    if s == "50M+"  then return 50000000 end
+    if s == "100M+" then return 100000000 end
+    if s == "300M+" then return 300000000 end
+    if s == "1B+"   then return 1000000000 end
+    return 0
+end
+for i, opt in ipairs(feedOptions) do
+    local pill = create("TextButton", {
+        Parent = PillsRow, Size = UDim2.new(0, 0, 0, 26),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundColor3 = Theme.BgInput, Text = opt,
+        TextColor3 = Theme.TextDim, TextSize = 11,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = false, LayoutOrder = i, ZIndex = 5,
+    })
+    create("UIPadding", { Parent = pill, PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) })
+    corner(pill, 13)
+    stroke(pill, Theme.Border, 1, 0.3)
+    table.insert(feedButtons, pill)
+    trackConnection(pill.MouseButton1Click:Connect(function()
+        for _, b in ipairs(feedButtons) do
+            tween(b, 0.18, { BackgroundColor3 = Theme.BgInput, TextColor3 = Theme.TextDim })
+            tween(b.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.3 })
+        end
+        tween(pill, 0.2, { BackgroundColor3 = Theme.Orange, TextColor3 = Color3.fromRGB(15, 10, 8) })
+        tween(pill.UIStroke, 0.2, { Color = Theme.OrangeHi, Transparency = 0.1 })
+        CurrentFeedFilter = opt
+        -- auto-clear so the new filter starts fresh
+        if clearAllLogs then clearAllLogs() end
+    end))
+    if i == 1 then
+        pill.BackgroundColor3 = Theme.Orange
+        pill.TextColor3 = Color3.fromRGB(15, 10, 8)
+        pill.UIStroke.Color = Theme.OrangeHi
+        pill.UIStroke.Transparency = 0.1
+    end
+end
+
+local feedHeader = create("Frame", {
+    Parent = LogsTab, Size = UDim2.new(1, -4, 0, 18),
+    BackgroundTransparency = 1, LayoutOrder = 3, ZIndex = 5,
+})
+create("TextLabel", {
+    Parent = feedHeader, Size = UDim2.new(0.5, 0, 1, 0),
+    BackgroundTransparency = 1, Text = "LIVE FEED",
+    TextColor3 = Theme.Orange, TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
+})
+local DetectedLabel = create("TextLabel", {
+    Parent = feedHeader, AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, 0, 0, 0),
+    Size = UDim2.new(0.5, 0, 1, 0),
+    BackgroundTransparency = 1, Text = "0 detected",
+    TextColor3 = Theme.TextDim, TextSize = 11,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 5,
+})
+local LogsContainer = create("Frame", {
+    Parent = LogsTab, Size = UDim2.new(1, -4, 0, 0),
+    AutomaticSize = Enum.AutomaticSize.Y,
+    BackgroundTransparency = 1, LayoutOrder = 4, ZIndex = 5,
+})
+create("UIListLayout", {
+    Parent = LogsContainer,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 8),
+})
+
+-- ════════════════════════════════════════════════
+-- FILTERS TAB (with whitelist row)
+-- ════════════════════════════════════════════════
+create("UIListLayout", {
+    Parent = FiltersTab, SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 10),
+})
+
+local AllPets = {
+    {n="1x1x1x1",r="S"},{n="25",r="S"},{n="6",r="S"},{n="67",r="S"},
+    {n="Abyssaloco",r="S"},{n="Agarrini la Palini",r="S"},{n="Antonio",r="S"},
+    {n="Aquatic Index",r="S"},{n="Arachnid Family",r="S"},{n="Arcadopus",r="S"},
+    {n="Arcadragon",r="S"},{n="Aura Farm Boat",r="S"},
+    {n="Baby Duo Brainrots",r="S"},{n="Bacuru and Egguru",r="S"},
+    {n="Bananito",r="S"},{n="Baskito",r="S"},{n="Berryno",r="S"},
+    {n="Bicicleteira Family",r="S"},{n="Bisonte Giuppitere",r="S"},
+    {n="Blackhole Goat",r="S"},{n="Boatito Auratito",r="S"},{n="Boppin Bunny",r="S"},
+    {n="Brunito Marsito",r="S"},{n="Buho de Volto",r="S"},
+    {n="Bunito Bunito Spinito",r="S"},{n="Bunny and Eggy",r="S"},
+    {n="Bunny Bunny Bunny",r="S"},{n="Bunny Bunny Bunny Sahur",r="S"},
+    {n="Bunnyman",r="S"},{n="Buntteo",r="S"},
+    {n="Burguro And Fryuro",r="S"},{n="Burrito Bandito",r="S"},
+    {n="Camera Ramena",r="S"},{n="Capitano Moby",r="S"},{n="Cash or Card",r="S"},
+    {n="Celestial Pegasus",r="S"},{n="Celularcini Viciosini",r="S"},
+    {n="Cerberus",r="S"},{n="Chachechi",r="S"},
+    {n="Chicleteira Bicicleteira",r="S"},{n="Chicleteira Cupideira",r="S"},
+    {n="Chicleteira Noelteira",r="S"},{n="Chicleteirina Bicicleteirina",r="S"},
+    {n="Chill Puppy",r="S"},{n="Chillin Chili",r="S"},{n="Chimnino",r="S"},
+    {n="Chimpanzini Spiderini",r="S"},{n="Chipso and Queso",r="S"},
+    {n="Churrito Bunnito",r="S"},{n="Cigno Fulgoro",r="S"},
+    {n="Cloverat Clapat",r="S"},{n="Coffin Tung Tung Tung Sahur",r="S"},
+    {n="Combinasion (Disambiguation)",r="S"},{n="Cooki and Milki",r="S"},
+    {n="Cuadramat and Pakrahmatmamat",r="S"},{n="Cupid",r="S"},
+    {n="Cupid Cupid Sahur",r="S"},{n="Cupid Hotspot",r="S"},
+    {n="Digi Narwhal",r="S"},{n="DJ Panda",r="S"},{n="Donkeyturbo Express",r="S"},
+    {n="Dragon Cannelloni",r="S"},{n="Dragon Gingerini",r="S"},
+    {n="Dug dug dug",r="S"},{n="Duggy Bros",r="S"},{n="Dul Dul Dul",r="S"},
+    {n="Duo Brainrots",r="S"},{n="Easter Easter Easter Sahur",r="S"},
+    {n="Eid Eid Eid Sahur",r="S"},{n="Elefanto Frigo",r="S"},
+    {n="Esok Sekolah",r="S"},{n="Eviledon",r="S"},
+    {n="Extinct Matteo",r="S"},{n="Extinct Tralalero",r="S"},
+    {n="Festive 67",r="S"},{n="Filpa Sandala",r="S"},{n="Fishboard",r="S"},
+    {n="Fishing Event",r="S"},{n="Fishino Clownino",r="S"},
+    {n="Fortunu and Cashuru",r="S"},{n="Foxini Lanternini",r="S"},
+    {n="Fragola La La La",r="S"},{n="Fragrama and Chocrama",r="S"},
+    {n="Frankentteo",r="S"},{n="Futbolini Skatini",r="S"},
+    {n="Garama and Madundung",r="S"},{n="Giftini Spyderini",r="S"},
+    {n="Ginger Gerat",r="S"},{n="Glaciator",r="S"},{n="Globa Steppa",r="S"},
+    {n="GOAT",r="S"},{n="Gobblino Uniciclino",r="S"},{n="Gold Elf",r="S"},
+    {n="Gold Gold Gold",r="S"},{n="Graipuss Medussi",r="S"},{n="Granny",r="S"},
+    {n="Griffin",r="S"},{n="Guerriro Digitale",r="S"},{n="Guest 666",r="S"},
+    {n="Gym Bros",r="S"},{n="Ho Ho Ho Sahur",r="S"},
+    {n="Hopilikalika Hopilikalako",r="S"},{n="Horegini Boom",r="S"},
+    {n="Hydra Bunny",r="S"},{n="Hydra Dragon Cannelloni",r="S"},
+    {n="Ice Dragon",r="S"},{n="Jackorilla",r="S"},{n="Job Job Job Sahur",r="S"},
+    {n="John Doe",r="S"},{n="Jolly Jolly Sahur",r="S"},{n="Kalika Bros",r="S"},
+    {n="Karker Sahur",r="S"},{n="Karkerkar Kurkur",r="S"},
+    {n="Karkerkur Family",r="S"},{n="Ketchuru and Musturu",r="S"},
+    {n="Ketupat Bros",r="S"},{n="Ketupat Kepat",r="S"},{n="La Casa Boo",r="S"},
+    {n="La Cucaracha",r="S"},{n="La Easter Grande",r="S"},
+    {n="La Extinct Grande",r="S"},{n="La Food Combinasion",r="S"},
+    {n="La Ginger Sekolah",r="S"},{n="La Grande Combinasion",r="S"},
+    {n="La Jolly Grande",r="S"},{n="La Karkerkar Combinasion",r="S"},
+    {n="La Lucky Grande",r="S"},{n="La Romantic Grande",r="S"},
+    {n="La Sahur Combinasion",r="S"},{n="La Secret Combinasion",r="S"},
+    {n="La Spooky Grande",r="S"},{n="La Supreme Combinasion",r="S"},
+    {n="La Taco Combinasion",r="S"},{n="La Vacca Jacko Linterino",r="S"},
+    {n="La Vacca Lepre Lepreino",r="S"},{n="La Vacca Prese Presente",r="S"},
+    {n="La Vacca Saturno Saturnita",r="S"},{n="Las Sis",r="S"},
+    {n="Las Tralaleritas",r="S"},{n="Las Vaquitas Saturnitas",r="S"},
+    {n="Lavadorito Spinito",r="S"},{n="Limited Quantity Brainrots",r="S"},
+    {n="List List List Sahur",r="S"},{n="Los 25",r="S"},{n="Los 67",r="S"},
+    {n="Los Amigos",r="S"},{n="Los Bros",r="S"},{n="Los Bunitos",r="S"},
+    {n="Los Burritos",r="S"},{n="Los Candies",r="S"},{n="Los Chicleteiras",r="S"},
+    {n="Los Chillis",r="S"},{n="Los Combinasionas",r="S"},
+    {n="Los Cucarachas",r="S"},{n="Los Cupids",r="S"},{n="Los Hackers",r="S"},
+    {n="Los Hotspotsitos",r="S"},{n="Los Jobcitos",r="S"},
+    {n="Los Jolly Combinasionas",r="S"},{n="Los Karkeritos",r="S"},
+    {n="Los Mariachis",r="S"},{n="Los Matteos",r="S"},{n="Los Mi Gatitos",r="S"},
+    {n="Los Mobilis",r="S"},{n="Los Nooo My Hotspotsitos",r="S"},
+    {n="Los Planitos",r="S"},{n="Los Primos",r="S"},{n="Los Puggies",r="S"},
+    {n="Los Quesadillas",r="S"},{n="Los Sekolahs",r="S"},{n="Los Spaghettis",r="S"},
+    {n="Los Spooky Combinasionas",r="S"},{n="Los Spyderinis",r="S"},
+    {n="Los Sweethearts",r="S"},{n="Los Tacoritas",r="S"},{n="Los Tortus",r="S"},
+    {n="Los Tralaleritos",r="S"},{n="Los Trios",r="S"},{n="Love Love Bear",r="S"},
+    {n="Love Love Love Sahur",r="S"},{n="Lovin Rose",r="S"},
+    {n="Luck Luck Luck Sahur",r="S"},{n="Lucky Blocks",r="S"},
+    {n="Luv Luv Luv",r="S"},{n="Mariachi Corazoni",r="S"},{n="Mi Gatito",r="S"},
+    {n="Mieteteira Bicicleteira",r="S"},{n="Money Money Bros",r="S"},
+    {n="Money Money Puggy",r="S"},{n="Money Money Reindeer",r="S"},
+    {n="Nacho Spyder",r="S"},{n="Naughty Naughty",r="S"},
+    {n="Noo my Candy",r="S"},{n="Noo my Eggs",r="S"},{n="Noo my examine",r="S"},
+    {n="Noo my Gold",r="S"},{n="Noo my Heart",r="S"},{n="Noo my Present",r="S"},
+    {n="Nooo My Hotspot",r="S"},{n="North Pole Event",r="S"},
+    {n="Nuclearo Dinossauro",r="S"},{n="Orcaledon",r="S"},
+    {n="Perrito Burrito",r="S"},{n="Pirulitoita Bicicleteira",r="S"},
+    {n="Please my Present",r="S"},{n="Popcuru and Fizzuru",r="S"},
+    {n="Pot Hotspot",r="S"},{n="Pot Pumpkin",r="S"},{n="Pumpkini Spyderini",r="S"},
+    {n="Quesadilla Crocodila",r="S"},{n="Quesadillo Vampiro",r="S"},
+    {n="Rang Ring Bus",r="S"},{n="Reindeer Tralala",r="S"},
+    {n="Reinito Sleighito",r="S"},{n="Rocco Disco",r="S"},
+    {n="Rosetti Tualetti",r="S"},{n="Rosey and Teddy",r="S"},
+    {n="Sammyni Fattini",r="S"},{n="Sammyni Spyderini",r="S"},
+    {n="Santa Hotspot",r="S"},{n="Santteo",r="S"},{n="Secret",r="S"},
+    {n="Secret Lucky Block",r="S"},{n="Serafinna Medusella",r="S"},
+    {n="Signore Carapace",r="S"},{n="Snailo Clovero",r="S"},
+    {n="Spaghetti Tualetti",r="S"},{n="Spinny Hammy",r="S"},
+    {n="Spooky and Pumpky",r="S"},{n="Swag Soda",r="S"},{n="Swaggy Bros",r="S"},
+    {n="Tacorillo Crocodillo",r="S"},{n="Tacorita Bicicleta",r="S"},
+    {n="Tang Tang Keletang",r="S"},{n="Tictac Sahur",r="S"},
+    {n="Tirilikalika Tirilikalako",r="S"},{n="To to to Sahur",r="S"},
+    {n="Torrtuginni Dragonfrutini",r="S"},{n="Tralaledon",r="S"},
+    {n="Strawberry Elephant",r="OG"},{n="Meowl",r="OG"},
+    {n="Skibidi Toilet",r="OG"},{n="Headless Horseman",r="OG"},
+}
+
+
+-- ════════════════════════════════════════════════
+-- FILTERS TAB
+-- ════════════════════════════════════════════════
+create("UIListLayout", { Parent = FiltersTab, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) })
+create("UIPadding", { Parent = FiltersTab, PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 2), PaddingBottom = UDim.new(0, 8) })
+
+sectionHeader(FiltersTab, "Whitelist", 1)
+
+-- Enable/disable whitelist toggle
+local wlToggleRow = create("Frame", {
+    Parent = FiltersTab, Size = UDim2.new(1, -4, 0, 36),
+    BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0,
+    LayoutOrder = 1, ZIndex = 5,
+})
+corner(wlToggleRow, 10); stroke(wlToggleRow, Theme.Border, 1, 0.3)
+create("TextLabel", {
+    Parent = wlToggleRow, Position = UDim2.new(0, 14, 0, 0),
+    Size = UDim2.new(0.65, 0, 1, 0),
+    BackgroundTransparency = 1, Text = "Enable Whitelist Filter",
+    TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
+})
+local wlToggleTrack = create("Frame", {
+    Parent = wlToggleRow, AnchorPoint = Vector2.new(1, 0.5),
+    Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.new(0, 40, 0, 20),
+    BackgroundColor3 = Theme.BgInput, BorderSizePixel = 0, ZIndex = 6,
+})
+corner(wlToggleTrack, 10)
+local wlToggleDot = create("Frame", {
+    Parent = wlToggleTrack, AnchorPoint = Vector2.new(0, 0.5),
+    Position = UDim2.new(0, 2, 0.5, 0), Size = UDim2.new(0, 16, 0, 16),
+    BackgroundColor3 = Theme.TextMute, BorderSizePixel = 0, ZIndex = 7,
+})
+corner(wlToggleDot, 8)
+local function setWlToggle(on)
+    SettingsState.UseWhitelist = on
+    tween(wlToggleTrack, 0.15, { BackgroundColor3 = on and Theme.OrangeDim or Theme.BgInput })
+    tween(wlToggleDot, 0.15, {
+        Position = on and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
+        BackgroundColor3 = on and Theme.Orange or Theme.TextMute,
+    })
+end
+trackConnection(wlToggleRow.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        setWlToggle(not SettingsState.UseWhitelist)
+    end
+end))
+
+-- Count label + configure button row
+-- full-width configure button with count badge inside
+local wlConfigBtn = create("TextButton", {
+    Parent = FiltersTab, Size = UDim2.new(1, -4, 0, 42),
+    BackgroundColor3 = Theme.BgCard, Text = "",
+    AutoButtonColor = false, ZIndex = 5, BorderSizePixel = 0, LayoutOrder = 2,
+})
+corner(wlConfigBtn, 10); stroke(wlConfigBtn, Theme.Orange, 1, 0.35)
+trackConnection(wlConfigBtn.MouseEnter:Connect(function() tween(wlConfigBtn, 0.15, { BackgroundColor3 = Theme.BgCardHi }) end))
+trackConnection(wlConfigBtn.MouseLeave:Connect(function() tween(wlConfigBtn, 0.15, { BackgroundColor3 = Theme.BgCard }) end))
+create("TextLabel", {
+    Parent = wlConfigBtn, Position = UDim2.new(0, 14, 0, 0),
+    Size = UDim2.new(0.6, 0, 1, 0),
+    BackgroundTransparency = 1, Text = "⚙  Configure Whitelist",
+    TextColor3 = Theme.Orange, TextSize = 13, Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
+})
+local wlCountLbl = create("TextLabel", {
+    Parent = wlConfigBtn, AnchorPoint = Vector2.new(1, 0.5),
+    Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.new(0, 90, 0, 24),
+    BackgroundColor3 = Theme.BgInput, BorderSizePixel = 0,
+    Text = "0 selected", TextColor3 = Theme.TextDim,
+    TextSize = 11, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 6,
+})
+corner(wlCountLbl, 6)
+
+create("TextLabel", {
+    Parent = FiltersTab, Size = UDim2.new(1, -4, 0, 14),
+    BackgroundTransparency = 1,
+    Text = "When enabled, only selected brainrots appear in logs.",
+    TextColor3 = Theme.TextMute, TextSize = 10, Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 3, ZIndex = 5,
+})
+
+sectionHeader(FiltersTab, "Min Money Per Brainrot", 4)
+create("TextLabel", {
+    Parent = FiltersTab, Size = UDim2.new(1, -4, 0, 14),
+    BackgroundTransparency = 1, Text = "Enabled brainrots appear here. Leave blank = no minimum.",
+    TextColor3 = Theme.TextMute, TextSize = 10, Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 5, ZIndex = 5,
+})
+
+local PetMinContainer = create("Frame", {
+    Parent = FiltersTab, Size = UDim2.new(1, -4, 0, 10),
+    BackgroundTransparency = 1, LayoutOrder = 6,
+    AutomaticSize = Enum.AutomaticSize.Y, ZIndex = 5,
+})
+create("UIListLayout", { Parent = PetMinContainer, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) })
+
+local PetMinRows = {}
+local WlSelected = WhitelistSelected  -- alias: same table, one source of truth
+
+local function refreshMinRows()
+    local count = 0
+    for name, on in pairs(WlSelected) do
+        if PetMinRows[name] then
+            PetMinRows[name].card.Visible = on == true
+        end
+        if on then count = count + 1 end
+    end
+    wlCountLbl.Text = count .. " selected"
+end
+
+local function ensurePetMinRow(petName)
+    if PetMinRows[petName] then refreshMinRows(); return end
+    local card = create("Frame", {
+        Parent = PetMinContainer, Size = UDim2.new(1, 0, 0, 36),
+        BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0,
+        LayoutOrder = 0, ZIndex = 5, Visible = WlSelected[petName] == true,
+    })
+    corner(card, 8); stroke(card, Theme.Border, 1, 0.3)
+    create("TextLabel", {
+        Parent = card, Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(0.55, 0, 1, 0),
+        BackgroundTransparency = 1, Text = petName,
+        TextColor3 = Theme.Text, TextSize = 11, Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 6,
+    })
+    local boxBg = create("Frame", {
+        Parent = card, AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -10, 0.5, 0),
+        Size = UDim2.new(0, 110, 0, 24),
+        BackgroundColor3 = Theme.BgInput, BorderSizePixel = 0, ZIndex = 5,
+    })
+    corner(boxBg, 6); stroke(boxBg, Theme.Border, 1, 0.3)
+    local box = create("TextBox", {
+        Parent = boxBg, Size = UDim2.new(1, -10, 1, 0),
+        Position = UDim2.new(0, 5, 0, 0),
+        BackgroundTransparency = 1,
+        Text = fmtMin(PetMinValues[petName] or 0), PlaceholderText = "e.g. 500M",
+        TextColor3 = Theme.Text, TextSize = 11, Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, ZIndex = 6,
+    })
+    trackConnection(box.Focused:Connect(function() tween(boxBg.UIStroke, 0.18, { Color = Theme.Orange, Transparency = 0.1 }) end))
+    trackConnection(box.FocusLost:Connect(function()
+        tween(boxBg.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.3 })
+        local v = parseMin(box.Text); PetMinValues[petName] = v; box.Text = fmtMin(v)
+        task.defer(autoSave)
+    end))
+    PetMinRows[petName] = { card = card, box = box }
+    refreshMinRows()
+end
+
+-- ── SELECTOR POPUP ────────────────────────────────────────────
+local selPop = create("Frame", {
+    Parent = ScreenGui, Size = UDim2.new(0, 300, 0, 440),
+    Position = UDim2.new(0.5, 10, 0.5, -220),
+    BackgroundColor3 = Theme.BgDeep, BorderSizePixel = 0,
+    Visible = false, ZIndex = 50,
+})
+corner(selPop, 12); stroke(selPop, Theme.Orange, 1.5, 0.3)
+
+local selHdr = create("Frame", {
+    Parent = selPop, Size = UDim2.new(1, 0, 0, 40),
+    BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0, ZIndex = 51,
+})
+corner(selHdr, 12)
+-- square off bottom corners of header
+create("Frame", { Parent = selHdr, Size = UDim2.new(1, 0, 0, 12), Position = UDim2.new(0, 0, 1, -12), BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0, ZIndex = 51 })
+create("TextLabel", {
+    Parent = selHdr, Position = UDim2.new(0, 14, 0, 0), Size = UDim2.new(1, -50, 1, 0),
+    BackgroundTransparency = 1, Text = "SELECT BRAINROTS",
+    TextColor3 = Theme.Text, TextSize = 12, Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 52,
+})
+local selCloseBtn = create("TextButton", {
+    Parent = selHdr, AnchorPoint = Vector2.new(1, 0.5),
+    Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.new(0, 24, 0, 24),
+    BackgroundColor3 = Theme.BgInput, Text = "×", TextColor3 = Theme.TextDim,
+    TextSize = 16, Font = Enum.Font.GothamBold, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 52,
+})
+corner(selCloseBtn, 6)
+
+-- search
+local selSearchBg = create("Frame", {
+    Parent = selPop, Position = UDim2.new(0, 8, 0, 48),
+    Size = UDim2.new(1, -16, 0, 28),
+    BackgroundColor3 = Theme.BgInput, BorderSizePixel = 0, ZIndex = 51,
+})
+corner(selSearchBg, 7); stroke(selSearchBg, Theme.Border, 1, 0.3)
+local selSearch = create("TextBox", {
+    Parent = selSearchBg, Size = UDim2.new(1, -12, 1, 0), Position = UDim2.new(0, 6, 0, 0),
+    BackgroundTransparency = 1, PlaceholderText = "search...",
+    Text = "", TextColor3 = Theme.Text, TextSize = 11, Font = Enum.Font.Gotham,
+    ClearTextOnFocus = false, ZIndex = 52,
+})
+
+-- scroll list
+local selScroll = create("ScrollingFrame", {
+    Parent = selPop, Position = UDim2.new(0, 8, 0, 84),
+    Size = UDim2.new(1, -16, 1, -130),
+    BackgroundTransparency = 1, BorderSizePixel = 0,
+    ScrollBarThickness = 3, ScrollBarImageColor3 = Theme.OrangeDim,
+    CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 51,
+})
+create("UIListLayout", { Parent = selScroll, Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder })
+
+-- done button
+local selDoneBtn = create("TextButton", {
+    Parent = selPop, AnchorPoint = Vector2.new(0, 1),
+    Position = UDim2.new(0, 8, 1, -8), Size = UDim2.new(1, -16, 0, 32),
+    BackgroundColor3 = Theme.Orange, Text = "DONE",
+    TextColor3 = Color3.fromRGB(15, 10, 8), TextSize = 13,
+    Font = Enum.Font.GothamBold, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 52,
+})
+corner(selDoneBtn, 9)
+
+local selRows = {}
+local function rebuildSelList(filter)
+    for _, r in ipairs(selRows) do if r and r.Parent then r:Destroy() end end
+    selRows = {}
+    local fl = (filter or ""):lower()
+    for _, pet in ipairs(AllPets) do
+        if fl == "" or pet.n:lower():find(fl, 1, true) then
+            local on = WlSelected[pet.n] == true
+            local row = create("TextButton", {
+                Parent = selScroll, Size = UDim2.new(1, 0, 0, 26),
+                BackgroundColor3 = on and Theme.BgCardHi or Theme.BgCard,
+                Text = "", AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 52,
+            })
+            corner(row, 6); table.insert(selRows, row)
+            local cb = create("Frame", {
+                Parent = row, Position = UDim2.new(0, 6, 0.5, -6),
+                Size = UDim2.new(0, 12, 0, 12),
+                BackgroundColor3 = on and Theme.Orange or Theme.BgInput,
+                BorderSizePixel = 0, ZIndex = 53,
+            })
+            corner(cb, 3)
+            if on then
+                create("TextLabel", { Parent = cb, Size = UDim2.new(1,0,1,0), BackgroundTransparency=1,
+                    Text="✓", TextColor3=Color3.fromRGB(10,8,5), TextSize=9, Font=Enum.Font.GothamBold,
+                    TextXAlignment=Enum.TextXAlignment.Center, ZIndex=54 })
+            end
+            create("TextLabel", {
+                Parent = row, Position = UDim2.new(0, 24, 0, 0), Size = UDim2.new(1, -52, 1, 0),
+                BackgroundTransparency = 1, Text = pet.n,
+                TextColor3 = on and Theme.Text or Theme.TextDim,
+                TextSize = 11, Font = Enum.Font.Gotham,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 52,
+            })
+            local pn = pet.n
+            trackConnection(row.MouseButton1Click:Connect(function()
+                WlSelected[pn] = not (WlSelected[pn] == true)
+                WhitelistSelected[pn] = WlSelected[pn]
+                ensurePetMinRow(pn)
+                rebuildSelList(selSearch.Text)
+            end))
+        end
+    end
+end
+
+trackConnection(selSearch:GetPropertyChangedSignal("Text"):Connect(function() rebuildSelList(selSearch.Text) end))
+trackConnection(selCloseBtn.MouseButton1Click:Connect(function() selPop.Visible = false end))
+trackConnection(selDoneBtn.MouseButton1Click:Connect(function()
+    selPop.Visible = false
+    task.defer(autoSave)
+end))
+
+trackConnection(wlConfigBtn.MouseButton1Click:Connect(function()
+    selSearch.Text = ""
+    rebuildSelList("")
+    selPop.Visible = true
+end))
+
+-- Pre-load saved config synchronously before init loop so whitelist isn't wiped
+do
+    local _preRaw = nil
+    pcall(function() if readfile then _preRaw = readfile("DragonNotifier_v3_config.json") end end)
+    if _preRaw and _preRaw ~= "" then
+        local ok2, data = pcall(HttpService.JSONDecode, HttpService, _preRaw)
+        if ok2 and type(data) == "table" then
+            if type(data.wl) == "table" then
+                for _, name in ipairs(data.wl) do WhitelistSelected[name] = true end
+            end
+            if type(data.ss) == "table" then
+                for k, v in pairs(data.ss) do
+                    if k ~= "AutoJoin" and SettingsState[k] ~= nil and type(v) == "boolean" then
+                        SettingsState[k] = v
+                    end
+                end
+            end
+            if type(data.pm) == "table" then
+                for name, v in pairs(data.pm) do PetMinValues[name] = tonumber(v) or 0 end
+            end
+            if type(data.si) == "table" then
+                for k, v in pairs(data.si) do
+                    if SettingsInputs[k] then SettingsInputs[k].Text = tostring(v) end
+                end
+            end
+        end
+    end
+    SettingsState.AutoJoin = false  -- always OFF on load
+end
+
+-- init AllPets rows -- skip if already loaded above
+for _, pet in ipairs(AllPets) do
+    if WhitelistSelected[pet.n] == nil then WhitelistSelected[pet.n] = false end
+    ensurePetMinRow(pet.n)
+end
+-- ════════════════════════════════════════════════
+-- CONFIG TAB  --  Export / Import
+-- ════════════════════════════════════════════════
+create("UIListLayout", { Parent = ConfigTab, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10) })
+create("UIPadding", { Parent = ConfigTab, PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) })
+
+sectionHeader(ConfigTab, "CONFIG STRING", 1)
+
+create("TextLabel", {
+    Parent = ConfigTab, LayoutOrder = 2, Size = UDim2.new(1, -4, 0, 28),
+    BackgroundTransparency = 1, TextWrapped = true,
+    Text = "Export saves your whitelist, min values and settings to a code. Paste it back to import.",
+    TextColor3 = Theme.TextMute, TextSize = 10, Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
+})
+
+-- button row
+local cfgBtnRow = create("Frame", {
+    Parent = ConfigTab, LayoutOrder = 3, Size = UDim2.new(1, -4, 0, 36),
+    BackgroundTransparency = 1, ZIndex = 5,
+})
+create("UIListLayout", { Parent = cfgBtnRow, FillDirection = Enum.FillDirection.Horizontal,
+    Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Center })
+
+local exportBtn = create("TextButton", {
+    Parent = cfgBtnRow, Size = UDim2.new(0.5, -4, 1, 0),
+    BackgroundColor3 = Theme.Orange, Text = "EXPORT",
+    TextColor3 = Color3.fromRGB(15,10,8), TextSize = 13, Font = Enum.Font.GothamBold,
+    AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 6,
+})
+corner(exportBtn, 9)
+trackConnection(exportBtn.MouseEnter:Connect(function() tween(exportBtn, 0.15, { BackgroundColor3 = Theme.OrangeHi }) end))
+trackConnection(exportBtn.MouseLeave:Connect(function() tween(exportBtn, 0.15, { BackgroundColor3 = Theme.Orange }) end))
+
+local importBtn = create("TextButton", {
+    Parent = cfgBtnRow, Size = UDim2.new(0.5, -4, 1, 0),
+    BackgroundColor3 = Theme.BgCard, Text = "IMPORT",
+    TextColor3 = Theme.Orange, TextSize = 13, Font = Enum.Font.GothamBold,
+    AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 6,
+})
+corner(importBtn, 9); stroke(importBtn, Theme.Orange, 1, 0.35)
+trackConnection(importBtn.MouseEnter:Connect(function() tween(importBtn, 0.15, { BackgroundColor3 = Theme.BgCardHi }) end))
+trackConnection(importBtn.MouseLeave:Connect(function() tween(importBtn, 0.15, { BackgroundColor3 = Theme.BgCard }) end))
+
+-- code box
+local cfgCard = create("Frame", {
+    Parent = ConfigTab, LayoutOrder = 4, Size = UDim2.new(1, -4, 0, 70),
+    BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0, ZIndex = 5,
+})
+corner(cfgCard, 10); stroke(cfgCard, Theme.Border, 1, 0.3)
+local cfgBox = create("TextBox", {
+    Parent = cfgCard, Size = UDim2.new(1, -16, 1, -16), Position = UDim2.new(0, 8, 0, 8),
+    BackgroundTransparency = 1, Text = "", PlaceholderText = "Config code appears here...",
+    TextColor3 = Theme.Text, PlaceholderColor3 = Theme.TextMute,
+    TextSize = 11, Font = Enum.Font.Code,
+    TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+    TextWrapped = true, MultiLine = true, ClearTextOnFocus = false, ZIndex = 6,
+})
+trackConnection(cfgBox.Focused:Connect(function()
+    tween(cfgCard.UIStroke, 0.18, { Color = Theme.Orange, Transparency = 0.1 })
+end))
+trackConnection(cfgBox.FocusLost:Connect(function()
+    tween(cfgCard.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.3 })
+end))
+
+-- copy button
+local copyCfgBtn = create("TextButton", {
+    Parent = ConfigTab, LayoutOrder = 5, Size = UDim2.new(1, -4, 0, 30),
+    BackgroundColor3 = Theme.BgCard, Text = "Copy to Clipboard",
+    TextColor3 = Theme.TextDim, TextSize = 12, Font = Enum.Font.GothamMedium,
+    AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 5,
+})
+corner(copyCfgBtn, 8); stroke(copyCfgBtn, Theme.Border, 1, 0.3)
+trackConnection(copyCfgBtn.MouseEnter:Connect(function() tween(copyCfgBtn, 0.15, { BackgroundColor3 = Theme.BgCardHi }) end))
+trackConnection(copyCfgBtn.MouseLeave:Connect(function() tween(copyCfgBtn, 0.15, { BackgroundColor3 = Theme.BgCard }) end))
+
+sectionHeader(ConfigTab, "WHAT'S INCLUDED", 6)
+create("TextLabel", {
+    Parent = ConfigTab, LayoutOrder = 7, Size = UDim2.new(1, -4, 0, 60),
+    BackgroundTransparency = 1, TextWrapped = true,
+    Text = "• Whitelist (enabled brainrots)\n• Min money per brainrot\n• Global min value\n• Farm filter toggles\n• Sound / keybind settings",
+    TextColor3 = Theme.TextDim, TextSize = 11, Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 5,
+})
+
+-- ── ENCODE / DECODE ──────────────────────────────────────────
+local HttpService = game:GetService("HttpService")
+local function encodeConfig()
+    local data = {
+        wl   = {},   -- whitelist: {name=true/false}
+        pm   = {},   -- petMinValues: {name=value}
+        ss   = {},   -- settingsState snapshot
+        si   = {},   -- settingsInputs values
+    }
+    -- whitelist
+    for name, on in pairs(WlSelected) do
+        if on then data.wl[#data.wl+1] = name end
+    end
+    -- per-pet min money
+    for name, v in pairs(PetMinValues) do
+        if v and v > 0 then data.pm[name] = v end
+    end
+    -- settings toggles
+    for k, v in pairs(SettingsState) do data.ss[k] = v end
+    -- settings text inputs
+    for k, v in pairs(SettingsInputs) do
+        if v and v.Text and v.Text ~= "" then data.si[k] = v.Text end
+    end
+    local ok, encoded = pcall(HttpService.JSONEncode, HttpService, data)
+    return ok and encoded or nil
+end
+
+local function applyConfig(str)
+    local ok, data = pcall(HttpService.JSONDecode, HttpService, str)
+    if not ok or type(data) ~= "table" then return false end
+    -- restore whitelist
+    if type(data.wl) == "table" then
+        for name in pairs(WlSelected) do WlSelected[name] = false; WhitelistSelected[name] = false end
+        for _, name in ipairs(data.wl) do
+            WlSelected[name] = true; WhitelistSelected[name] = true
+        end
+        refreshMinRows()
+    end
+    -- restore per-pet min money
+    if type(data.pm) == "table" then
+        for name, v in pairs(data.pm) do
+            PetMinValues[name] = tonumber(v) or 0
+            if PetMinRows[name] and PetMinRows[name].box then
+                PetMinRows[name].box.Text = fmtMin(PetMinValues[name])
+            end
+        end
+    end
+    -- restore settings toggles
+    if type(data.ss) == "table" then
+        for k, v in pairs(data.ss) do
+            if SettingsState[k] ~= nil and type(v) == "boolean" then
+                SettingsState[k] = v
+            end
+        end
+        SettingsState.AutoJoin = false  -- never restore AutoJoin on import either
+        setAutoJoin(false)
+        setWlToggle(SettingsState.UseWhitelist)
+    end
+    -- restore text inputs
+    if type(data.si) == "table" then
+        for k, v in pairs(data.si) do
+            if SettingsInputs[k] then SettingsInputs[k].Text = tostring(v) end
+        end
+    end
+    return true
+end
+
+-- ── AUTO SAVE / LOAD ─────────────────────────────────────────
+local SAVE_KEY = "DragonNotifier_v3_config.json"
+
+local function autoSave()
+    local code = encodeConfig()
+    if not code then return end
+    pcall(function()
+        if writefile then writefile(SAVE_KEY, code) end
+    end)
+end
+
+local function autoLoad()
+    local ok, raw = pcall(function()
+        if readfile then return readfile(SAVE_KEY) end
+        return nil
+    end)
+    if ok and raw and raw ~= "" then
+        local loaded = applyConfig(raw)
+        if loaded then
+            -- sync all toggle visuals that may have changed
+            pcall(function()
+                -- rebuild WlSelected-driven UI rows
+                for name, on in pairs(WlSelected) do
+                    WhitelistSelected[name] = on
+                    ensurePetMinRow(name)
+                end
+                refreshMinRows()
+                if whitelistRefreshList then pcall(whitelistRefreshList) end
+            end)
+            print("[Dragon Notifier] Config auto-loaded from " .. SAVE_KEY)
+        end
+    end
+end
+
+-- Wrap every state mutation to also auto-save
+local _origSetAutoJoin = setAutoJoin
+setAutoJoin = function(state)
+    _origSetAutoJoin(state)
+    task.defer(autoSave)
+end
+
+local _origSetWlToggle = setWlToggle
+setWlToggle = function(on)
+    _origSetWlToggle(on)
+    task.defer(autoSave)
+end
+
+-- Auto-save on whitelist popup close (Done button)
+-- patched below where selDoneBtn click is connected
+
+trackConnection(exportBtn.MouseButton1Click:Connect(function()
+    local code = encodeConfig()
+    if code then
+        cfgBox.Text = code
+        exportBtn.Text = "EXPORTED!"
+        task.delay(1.5, function() if exportBtn.Parent then exportBtn.Text = "EXPORT" end end)
+    else
+        cfgBox.Text = "[Export failed]"
+    end
+end))
+
+trackConnection(importBtn.MouseButton1Click:Connect(function()
+    local str = cfgBox.Text:match("^%s*(.-)%s*$")
+    if str == "" then return end
+    local ok = applyConfig(str)
+    if ok then task.defer(autoSave) end
+    importBtn.Text = ok and "IMPORTED!" or "INVALID CODE"
+    task.delay(1.5, function() if importBtn.Parent then importBtn.Text = "IMPORT" end end)
+end))
+
+trackConnection(copyCfgBtn.MouseButton1Click:Connect(function()
+    local code = cfgBox.Text ~= "" and cfgBox.Text or encodeConfig()
+    if code then
+        cfgBox.Text = code
+        pcall(setclipboard, code)
+        copyCfgBtn.Text = "Copied!"
+        task.delay(1.5, function() if copyCfgBtn.Parent then copyCfgBtn.Text = "Copy to Clipboard" end end)
+    end
+end))
+
+-- ════════════════════════════════════════════════
+-- SETTINGS TAB
+-- ════════════════════════════════════════════════
+create("UIListLayout", {
+    Parent = SettingsTab, SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 10),
+})
+sectionHeader(SettingsTab, "General", 1)
+toggleCard(SettingsTab, "Auto-Minimize on Load", "Minimize UI automatically when executed.", "AutoMinimize", 2)
+sectionHeader(SettingsTab, "Farm Filters", 3)
+inputCard(SettingsTab, "MinValue", "Global min value ($/s)", "100", 2, 999999)
+toggleCard(SettingsTab, "Hide Full Servers", "Skip servers at max players.", "HideFull", 3)
+toggleCard(SettingsTab, "Ignore Small Servers", "Hide finds under 1M.", "IgnoreSmall", 4)
+sectionHeader(SettingsTab, "Notifications", 5)
+
+toggleCard(SettingsTab, "Notification Sound", "Play a sound on each new find.", "Sound", 2)
+inputCard(SettingsTab, "SoundID", "Custom Sound ID", "1342568949118398", 6)
+toggleCard(SettingsTab, "Mute All", "Mute ALL sounds (overrides notification sound).", "MuteAll", 7)
+sectionHeader(SettingsTab, "Join Settings", 7)
+inputCard(SettingsTab, "Retries", "Teleport Retries", "10", 8, 999)
+sectionHeader(SettingsTab, "Keybinds", 9)
+local kbCard = create("Frame", {
+    Parent = SettingsTab, Size = UDim2.new(1, -4, 0, 44),
+    BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0,
+    LayoutOrder = 7, ZIndex = 5,
+})
+corner(kbCard, 10)
+stroke(kbCard, Theme.Border, 1, 0.3)
+create("TextLabel", {
+    Parent = kbCard, Position = UDim2.new(0, 14, 0, 0),
+    Size = UDim2.new(0.5, 0, 1, 0),
+    BackgroundTransparency = 1, Text = "Toggle Menu",
+    TextColor3 = Theme.Text, TextSize = 13,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
+})
+local kbBtn = create("TextButton", {
+    Parent = kbCard, AnchorPoint = Vector2.new(1, 0.5),
+    Position = UDim2.new(1, -14, 0.5, 0),
+    Size = UDim2.new(0, 150, 0, 28),
+    BackgroundColor3 = Theme.BgInput, Text = "RightShift",
+    TextColor3 = Theme.Text, TextSize = 12,
+    Font = Enum.Font.GothamMedium,
+    AutoButtonColor = false, ZIndex = 5,
+})
+corner(kbBtn, 7)
+stroke(kbBtn, Theme.Border, 1, 0.3)
+local listeningKey = false
+local currentKey = Enum.KeyCode.RightShift
+trackConnection(kbBtn.MouseButton1Click:Connect(function()
+    listeningKey = true
+    kbBtn.Text = "..."
+    tween(kbBtn.UIStroke, 0.18, { Color = Theme.Orange, Transparency = 0.1 })
+end))
+trackConnection(UserInputService.InputBegan:Connect(function(input, processed)
+    if listeningKey and input.UserInputType == Enum.UserInputType.Keyboard then
+        listeningKey = false
+        currentKey = input.KeyCode
+        kbBtn.Text = currentKey.Name
+        tween(kbBtn.UIStroke, 0.18, { Color = Theme.Border, Transparency = 0.3 })
+    elseif not listeningKey and not processed and input.KeyCode == currentKey then
+        toggleMinimize()
+    end
+end))
+
+sectionHeader(SettingsTab, "About", 11)
+local aboutCard = create("Frame", {
+    Parent = SettingsTab, Size = UDim2.new(1, -4, 0, 66),
+    BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0,
+    LayoutOrder = 9, ZIndex = 5,
+})
+corner(aboutCard, 10)
+stroke(aboutCard, Theme.Border, 1, 0.3)
+create("TextLabel", {
+    Parent = aboutCard, Position = UDim2.new(0, 14, 0, 8),
+    Size = UDim2.new(1, -28, 0, 18),
+    BackgroundTransparency = 1, Text = "Dragon Notifier · Galaxy",
+    TextColor3 = Theme.Text, TextSize = 13,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
+})
+create("TextLabel", {
+    Parent = aboutCard, Position = UDim2.new(0, 14, 0, 28),
+    Size = UDim2.new(1, -120, 0, 16),
+    BackgroundTransparency = 1, Text = "by lakexnz · discord.gg/dragonnotifier",
+    TextColor3 = Theme.TextDim, TextSize = 11,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
+})
+local copyBtn = create("TextButton", {
+    Parent = aboutCard, AnchorPoint = Vector2.new(1, 1),
+    Position = UDim2.new(1, -14, 1, -10),
+    Size = UDim2.new(0, 90, 0, 26),
+    BackgroundColor3 = Theme.BgInput, Text = "Copy Invite",
+    TextColor3 = Theme.Orange, TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false, ZIndex = 5,
+})
+corner(copyBtn, 7)
+stroke(copyBtn, Theme.OrangeDeep, 1, 0.3)
+trackConnection(copyBtn.MouseEnter:Connect(function()
+    tween(copyBtn, 0.18, { BackgroundColor3 = Theme.BgCardHi })
+    tween(copyBtn.UIStroke, 0.18, { Color = Theme.Orange, Transparency = 0.1 })
+end))
+trackConnection(copyBtn.MouseLeave:Connect(function()
+    tween(copyBtn, 0.18, { BackgroundColor3 = Theme.BgInput })
+    tween(copyBtn.UIStroke, 0.18, { Color = Theme.OrangeDeep, Transparency = 0.3 })
+end))
+trackConnection(copyBtn.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard("https://discord.gg/dragonnotifier")
+        copyBtn.Text = "Copied!"
+        task.delay(1.5, function() copyBtn.Text = "Copy Invite" end)
+    end
+end))
+
+-- SOUND + TELEPORT
+local NotifySound = create("Sound", { Parent = ScreenGui, Volume = 0.5 })
+local function playNotify()
+    if SettingsState.MuteAll then return end
+    if not SettingsState.Sound then return end
+    local id = SettingsInputs["SoundID"] and SettingsInputs["SoundID"].Text or ""
+    NotifySound.SoundId = (id ~= "") and ("rbxassetid://" .. id) or "rbxassetid://1342568949118398"
+    pcall(function() NotifySound:Play() end)
+end
+local function forceServer(placeId, jobId)
+    local r = 10
+    if SettingsInputs["Retries"] and SettingsInputs["Retries"].Text ~= "" then
+        r = tonumber(SettingsInputs["Retries"].Text) or 10
+    end
+    task.spawn(function()
+        for i = 1, r do
+            local ok = pcall(function()
+                TeleportService:TeleportToPlaceInstance(tonumber(placeId), jobId, Player)
+            end)
+            if ok then break end
+            task.wait(1.5)
+        end
+    end)
+end
+
+local PENDING_JOIN_FILE = "DragonNotifier_pending_join.json"
+
+-- spamJoin: rapid-fire 25 teleports + persist the intended target so the
+-- next script execution (after the teleport completes) can pop a toast
+-- saying what brainrot we were going for.
+local function spamJoin(placeId, jobId, brainrotName, brainrotValue)
+    -- Save the join target to disk BEFORE the teleport fires.
+    -- writefile is safe to call repeatedly; only the last save sticks.
+    if writefile and brainrotName then
+        pcall(function()
+            writefile(PENDING_JOIN_FILE, HttpService:JSONEncode({
+                name = brainrotName,
+                value = brainrotValue or 0,
+                jobId = jobId,
+                placeId = placeId,
+                ts = os.time(),
+            }))
+        end)
+    end
+    task.spawn(function()
+        for i = 1, 25 do
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(tonumber(placeId), jobId, Player)
+            end)
+            task.wait(0.15)
+        end
+    end)
+end
+
+
+-- WHITELIST FILTER
+-- shared live gradient registry for log name/price labels
+-- Single shared animation table -- driven by ONE throttled loop (no FPS cost)
+local _liveGrads = {}
+local _animGrads = {}  -- header gradients: {g, phase, speed}
+task.spawn(function()
+    while ScreenGui.Parent do
+        local t = os.clock()
+        -- log entry shimmer (runs at 20fps max)
+        for i = #_liveGrads, 1, -1 do
+            local info = _liveGrads[i]
+            if info.g and info.g.Parent then
+                info.g.Offset = Vector2.new(math.sin(t*0.55+i*0.8)*0.5, 0)
+            else table.remove(_liveGrads, i) end
+        end
+        -- header / title gradients
+        for _, ag in ipairs(_animGrads) do
+            if ag.g and ag.g.Parent then
+                ag.g.Offset = Vector2.new(math.sin(t*ag.sp+ag.ph)*0.5, 0)
+            end
+        end
+        task.wait(0.1)  -- 10fps shimmer -- still smooth, way lower frame cost
+    end
+end)
+
+local function passesWhitelist(itemName)
+    if not SettingsState.UseWhitelist then return true end
+    if not itemName or itemName == "" then return false end
+    local anyEnabled = false
+    for _, on in pairs(WhitelistSelected) do
+        if on then anyEnabled = true; break end
+    end
+    if not anyEnabled then return false end
+    local lower = string.lower(itemName)
+    for name, on in pairs(WhitelistSelected) do
+        if on and string.find(lower, string.lower(name), 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+-- LOG ENTRIES
+local RenderedIDs = {}
+local LogEntries  = {}
+local DetectedCount = 0
+local MAX_LOGS = 80
+local function tierColor(v, isOG)
+    if isOG then return Theme.TierOG end
+    if v >= 500000000 then return Theme.TierSecret end
+    if v >= 100000000 then return Theme.TierHigh end
+    if v >= 10000000  then return Theme.TierMid end
+    return Theme.TierLow
+end
+local function tierLabel(v, isOG)
+    if isOG then return "OG" end
+    if v >= 500000000 then return "Secret" end
+    if v >= 100000000 then return "Rare" end
+    if v >= 10000000  then return "Normal" end
+    return "Common"
+end
+-- OG / Rare name detection (same lists as before)
+local OG_NAMES = {
+    "Signore Caprice", "Strawberry Elephant", "John Pork",
+    "Meowl", "Skibidi Toilet", "Headless Horseman",
+}
+local RARE_NAMES = {
+    "Elefanto", "Frigo Love Love Bear", "Antonio",
+    "Tirilikalika Tirilikalako", "Fishino", "Clownino", "Kalika Bros",
+}
+local function _nameInList(name, list)
+    if not name or name == "" then return false end
+    local low = string.lower(name)
+    for _, n in ipairs(list) do
+        if string.find(low, string.lower(n), 1, true) then return true end
+    end
+    return false
+end
+
+local function addLog(dbKey, itemName, numValue, jobId, placeId, isOG)
+    if RenderedIDs[dbKey] then return end
+    -- discover new dragon names for the whitelist
+    if itemName and addDiscoveredDragon(itemName) and whitelistRefreshList then
+        pcall(whitelistRefreshList)
+    end
+    if not passesWhitelist(itemName) then return end
+    if SettingsState.IgnoreSmall and numValue < 1000000 then return end
+    -- per-pet minimum value check
+    if itemName and PetMinValues[itemName] and PetMinValues[itemName] > 0 then
+        if numValue < PetMinValues[itemName] then return end
+    end
+
+    -- Active feed-pill filter
+    local isOGName   = isOG or _nameInList(itemName, OG_NAMES)
+    local isRareName = _nameInList(itemName, RARE_NAMES)
+    if CurrentFeedFilter == "OG" then
+        if not isOGName then return end
+    elseif CurrentFeedFilter == "Rare" then
+        if not isRareName then return end
+    else
+        if numValue < parseFilterValue(CurrentFeedFilter) then return end
+    end
+    -- Update the isOG flag so tier coloring catches up
+    isOG = isOGName
+
+    RenderedIDs[dbKey] = true
+    playNotify()
+    showToast(itemName, numValue, jobId, placeId)
+
+    local entry = create("CanvasGroup", {
+        Parent = LogsContainer, Size = UDim2.new(1, 0, 0, 60),
+        BackgroundColor3 = Theme.BgCard, BorderSizePixel = 0,
+        GroupTransparency = 1, LayoutOrder = -tick(), ZIndex = 5,
+        Position = UDim2.new(-0.1, 0, 0, 0),
+    })
+    corner(entry, 10)
+    stroke(entry, Theme.Border, 1, 0.3)
+    -- no tier label -- name starts higher
+    local bar = create("Frame", {
+        Parent = entry, Position = UDim2.new(0, 0, 0, 8),
+        Size = UDim2.new(0, 3, 1, -16),
+        BackgroundColor3 = Theme.Orange, BorderSizePixel = 0, ZIndex = 6,
+    })
+    corner(bar, 2)
+    -- pet name with live silver→orange→silver shimmer
+    local nameL = create("TextLabel", {
+        Parent = entry, Position = UDim2.new(0, 14, 0, 12),
+        Size = UDim2.new(0.58, 0, 0, 20),
+        BackgroundTransparency = 1, Text = itemName,
+        TextColor3 = Color3.fromRGB(230, 225, 255), TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 6,
+    })
+    local nameGrad = Instance.new("UIGradient"); nameGrad.Parent = nameL
+    nameGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0,   Color3.fromRGB(210, 200, 235)),
+        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 160,  60)),
+        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(230, 220, 255)),
+        ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 140,  30)),
+    }); nameGrad.Rotation = 90
+    table.insert(_liveGrads, {g = nameGrad})
+    -- price with live orange shimmer
+    local priceL = create("TextLabel", {
+        Parent = entry, Position = UDim2.new(0, 14, 0, 34),
+        Size = UDim2.new(0.58, 0, 0, 16),
+        BackgroundTransparency = 1,
+        Text = "$" .. formatMoney(numValue) .. "/s",
+        TextColor3 = Theme.Orange, TextSize = 11,
+        Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6,
+    })
+    local priceGrad = Instance.new("UIGradient"); priceGrad.Parent = priceL
+    priceGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0,   Color3.fromRGB(255, 180,  70)),
+        ColorSequenceKeypoint.new(0.45,Color3.fromRGB(210, 195, 230)),
+        ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 145,  30)),
+    }); priceGrad.Rotation = 90
+    table.insert(_liveGrads, {g = priceGrad})
+    -- live "Xs ago" label top-right
+    local timeLbl = create("TextLabel", {
+        Parent = entry, AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -84, 0, 8),
+        Size = UDim2.new(0, 70, 0, 14),
+        BackgroundTransparency = 1, Text = "just now",
+        TextColor3 = Theme.TextMute, TextSize = 10,
+        Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 6,
+    })
+    local _createdAt = os.time()
+
+    -- single JOIN button → spam joins on click (auto-join handles the rest)
+    local joinBtn = create("TextButton", {
+        Parent = entry, AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -10, 0.5, 0),
+        Size = UDim2.new(0, 64, 0, 30),
+        BackgroundColor3 = Theme.Orange, Text = "Join",
+        TextColor3 = Color3.fromRGB(15, 10, 8),
+        TextSize = 12, Font = Enum.Font.GothamBold,
+        AutoButtonColor = false, ZIndex = 6,
+    })
+    corner(joinBtn, 9)
+    stroke(joinBtn, Theme.OrangeHi, 1, 0.2)
+    trackConnection(joinBtn.MouseEnter:Connect(function()
+        tween(joinBtn, 0.12, { BackgroundColor3 = Theme.OrangeHi })
+    end))
+    trackConnection(joinBtn.MouseLeave:Connect(function()
+        tween(joinBtn, 0.12, { BackgroundColor3 = Theme.Orange })
+    end))
+    trackConnection(joinBtn.MouseButton1Click:Connect(function()
+        joinBtn.Text = "..."
+        if jobId and placeId then spamJoin(placeId, jobId, itemName, numValue) end
+        task.delay(2, function() if joinBtn and joinBtn.Parent then joinBtn.Text = "Join" end end)
+    end))
+
+    tween(entry, 0.5, {
+        GroupTransparency = 0,
+        Position = UDim2.new(0, 0, 0, 0)
+    }, Enum.EasingStyle.Quint)
+
+    table.insert(LogEntries, { UI = entry, DBKey = dbKey, TimeLbl = timeLbl, CreatedAt = _createdAt })
+    DetectedCount = DetectedCount + 1
+    DetectedLabel.Text = DetectedCount .. " detected"
+    tween(DetectedLabel, 0.2, { TextColor3 = Theme.Orange })
+    task.delay(0.6, function()
+        tween(DetectedLabel, 0.4, { TextColor3 = Theme.TextDim })
+    end)
+    if #LogEntries > MAX_LOGS then
+        local old = table.remove(LogEntries, 1)
+        if old.UI then old.UI:Destroy() end
+        RenderedIDs[old.DBKey] = nil
+    end
+    if SettingsState.AutoJoin and jobId and placeId then
+        forceServer(placeId, jobId)
+    end
+end
+
+clearAllLogs = function()
+    for _, c in ipairs(LogsContainer:GetChildren()) do
+        if c:IsA("CanvasGroup") then c:Destroy() end
+    end
+    table.clear(LogEntries)
+    table.clear(RenderedIDs)
+    DetectedCount = 0
+    DetectedLabel.Text = "0 detected"
+end
+trackConnection(ClearBtn.MouseButton1Click:Connect(clearAllLogs))
+
+-- Live "Xs ago" ticker for log entries
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(1)
+        local now = os.time()
+        for _, e in ipairs(LogEntries) do
+            if e.TimeLbl and e.TimeLbl.Parent and e.CreatedAt then
+                e.TimeLbl.Text = timeAgo(now - e.CreatedAt)
+            end
+        end
+    end
+end)
+
+-- SUPABASE CONNECTION (HTTP poll + WS attempt)
+;(function()
+local function parseGenVal(text)
+    if not text then return 0 end
+    local n = tonumber(text:match("([%d%.]+)")) or 0
+    local u = text:upper():match("[KMBT]") or ""
+    local m = ({K=1e3,M=1e6,B=1e9,T=1e12})[u]
+    return m and n*m or n
+end
+
+-- ── SCANNER CIPHER BRIDGE ────────────────────────────
+-- Mirrors the TieredScanner's key derivation so we can decrypt
+-- encrypted payload-column rows it writes to Supabase.
+-- Supports both encrypted rows (payload col) and legacy plaintext rows
+-- (name/gen_text/… cols) transparently via _decRow().
+local _decPayload, _decJob
+do
+    -- 1. Re-derive the Scanner's 64-byte keyblock
+    --    (_W1-_W16 identical to TieredScanner's _resolve vault)
+    local _sW = {
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(143,0xFF),8),bit32.bxor(40,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(3,0xFF),8),bit32.bxor(220,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(55,0xFF),8),bit32.bxor(40,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(248,0xFF),8),bit32.bxor(104,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(214,0xFF),8),bit32.bxor(119,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(237,0xFF),8),bit32.bxor(228,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(40,0xFF),8),bit32.bxor(140,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(200,0xFF),8),bit32.bxor(205,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(115,0xFF),8),bit32.bxor(211,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(186,0xFF),8),bit32.bxor(35,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(243,0xFF),8),bit32.bxor(103,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(92,0xFF),8),bit32.bxor(236,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(77,0xFF),8),bit32.bxor(178,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(55,0xFF),8),bit32.bxor(214,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(128,0xFF),8),bit32.bxor(120,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(66,0xFF),8),bit32.bxor(131,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(240,0xFF),8),bit32.bxor(248,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(236,0xFF),8),bit32.bxor(147,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(33,0xFF),8),bit32.bxor(175,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(229,0xFF),8),bit32.bxor(98,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(95,0xFF),8),bit32.bxor(133,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(60,0xFF),8),bit32.bxor(246,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(151,0xFF),8),bit32.bxor(147,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(185,0xFF),8),bit32.bxor(166,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(207,0xFF),8),bit32.bxor(171,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(90,0xFF),8),bit32.bxor(74,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(2,0xFF),8),bit32.bxor(39,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(188,0xFF),8),bit32.bxor(73,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(133,0xFF),8),bit32.bxor(178,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(21,0xFF),8),bit32.bxor(108,0xFF))),
+        bit32.bor(bit32.lshift(bit32.bor(bit32.lshift(bit32.bxor(0,0xFF),8),bit32.bxor(234,0xFF)),16),bit32.bor(bit32.lshift(bit32.bxor(101,0xFF),8),bit32.bxor(82,0xFF))),
+    }
+    local _sKB = {}
+    for _, w in ipairs(_sW) do
+        _sKB[#_sKB+1] = bit32.rshift(bit32.band(w,0xFF000000),24)
+        _sKB[#_sKB+1] = bit32.rshift(bit32.band(w,0x00FF0000),16)
+        _sKB[#_sKB+1] = bit32.rshift(bit32.band(w,0x0000FF00), 8)
+        _sKB[#_sKB+1] = bit32.band(w,0x000000FF)
+    end
+    _sW = nil
+
+    -- 2. Shared base64 helpers
+    local _b64a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    local _b64m = {}
+    for i=1,#_b64a do _b64m[string.sub(_b64a,i,i)]=i-1 end
+    local function _b64dec(s)
+        s = string.gsub(s,"[^A-Za-z0-9+/=]","")
+        local out = {}
+        for i=1,#s,4 do
+            local c1=_b64m[string.sub(s,i,  i  )] or 0
+            local c2=_b64m[string.sub(s,i+1,i+1)] or 0
+            local c3=_b64m[string.sub(s,i+2,i+2)] or 0
+            local c4=_b64m[string.sub(s,i+3,i+3)] or 0
+            local n=c1*262144+c2*4096+c3*64+c4
+            out[#out+1]=string.char(math.floor(n/65536)%256)
+            if string.sub(s,i+2,i+2)~="=" then out[#out+1]=string.char(math.floor(n/256)%256) end
+            if string.sub(s,i+3,i+3)~="=" then out[#out+1]=string.char(n%256) end
+        end
+        return table.concat(out)
+    end
+
+    -- 3. Resolve WS_URL using the Scanner's keyblock (not the Notifier's 5-layer cipher)
+    local _CT_WS = {"B6SPGef4Y+VI7311uRxDW+pFIK5g98RgnDi4Bw3m1B", "B4ZmpCvyBq"}
+local _CT_RELAY = {"GKOIU7vtKLhN+nN8uB1ZXfhFI7Vp6s981T7mXA+pzx", "1ma2QNp3577dA="}
+
+    local function _scanResolve()
+        local enc = _b64dec(table.concat(_CT_WS))
+        local out = {}
+        for i=1,#enc do
+            out[i] = string.char(bit32.bxor(string.byte(enc,i), _sKB[((i-1)%64)+1]))
+        end
+        return table.concat(out)
+    end
+    _sKB = nil -- drop keyblock; no longer needed after resolve
+
+    -- 4. Derive _payKey + _KB_LOCAL (exact mirror of TieredScanner derivation)
+    local _payKey    = {}
+    local _KB_LOCAL  = {}
+    local _seedStr   = _scanResolve() or "fallbackseed"
+    for i=1,32 do
+        _payKey[i]   = bit32.band(string.byte(_seedStr,((i-1)%#_seedStr)+1) * (i*7 +13),    0xFF)
+        _KB_LOCAL[i] = bit32.band(string.byte(_seedStr,((i-1)%#_seedStr)+1) * (i*11+23)+17, 0xFF)
+    end
+    _seedStr = nil
+
+    -- 5. PRG stream  (RC4-variant, mirrors _prgStream in TieredScanner)
+    local function _prgStream(key, nonce, length)
+        local S = {}
+        for i=0,255 do S[i]=i end
+        local j=0
+        for i=0,255 do
+            j=(j+S[i]+key[(i%32)+1]+nonce[(i%4)+1])%256
+            S[i],S[j]=S[j],S[i]
+        end
+        local ii,jj=0,0
+        local out={}
+        for _=1,length do
+            ii=(ii+1)%256; jj=(jj+S[ii])%256
+            S[ii],S[jj]=S[jj],S[ii]
+            out[#out+1]=S[(S[ii]+S[jj])%256]
+        end
+        return out
+    end
+
+    -- 6. Checksum  (position-weighted sum, mirrors _checksum in TieredScanner)
+    local function _checksum(s)
+        local v=0
+        for i=1,#s do v=(v+string.byte(s,i)*i)%256 end
+        return v
+    end
+
+    -- 7. _decPayload
+    --    Wire format written by TieredScanner's _encPayload:
+    --    [ nonce(4 B) ][ checksum(1 B) ][ ciphertext ]  → base64
+    function _decPayload(b64str)
+        if not b64str or b64str=="" then return nil end
+        local ok,raw = pcall(_b64dec,b64str)
+        if not ok or #raw<6 then return nil end
+        local nonce = {string.byte(raw,1),string.byte(raw,2),string.byte(raw,3),string.byte(raw,4)}
+        local storedCS = string.byte(raw,5)
+        local cipher   = string.sub(raw,6)
+        local stream   = _prgStream(_payKey,nonce,#cipher)
+        local plain    = {}
+        for i=1,#cipher do
+            plain[i]=string.char(bit32.bxor(string.byte(cipher,i),stream[i]))
+        end
+        local plainStr = table.concat(plain)
+        if _checksum(plainStr)~=storedCS then return nil end -- integrity check
+        return plainStr
+    end
+
+    -- 8. _decJob
+    --    TieredScanner XORs job-ID bytes with _KB_LOCAL then base64-encodes.
+    --    We reverse that. If the result isn't UUID-shaped we return the input
+    --    unchanged (handles plain job IDs from older scanner versions).
+    function _decJob(enc)
+        if not enc or enc=="" then return nil end
+        local ok,raw = pcall(_b64dec,enc)
+        if not ok or #raw==0 then return enc end
+        local out={}
+        for i=1,#raw do
+            out[i]=string.char(bit32.bxor(string.byte(raw,i),_KB_LOCAL[((i-1)%32)+1]))
+        end
+        local s=table.concat(out)
+        if s:match("^[0-9a-fA-F%-]+$") then return s end
+        return enc -- decryption produced garbage → keep original
+    end
+end -- cipher bridge
+
+-- Unwrap a Supabase row transparently:
+--   • encrypted rows  → f.payload decrypted + JSON-decoded
+--   • legacy rows     → f passed through as-is
+-- Returns a normalised table {name, gen_text, job_id, place_id,
+-- created_at, timestamp} or nil (skip this row).
+local function _decRow(f)
+    if f.payload and f.payload ~= "" then
+        local ok, jsonStr = pcall(_decPayload, f.payload)
+        if not ok or not jsonStr then return nil end
+        local ok2, dec = pcall(HttpService.JSONDecode, HttpService, jsonStr)
+        if not ok2 or type(dec)~="table" then return nil end
+        local jid = dec.job_id
+        if jid and jid~="" then
+            local ok3,dj = pcall(_decJob,jid); if ok3 and dj then jid=dj end
+        end
+        return {
+            name       = dec.name     or "",
+            gen_text   = dec.gen_text  or "",
+            job_id     = jid,
+            place_id   = dec.place_id  or f.place_id,
+            created_at = dec.timestamp or f.created_at or f.timestamp or "",
+            timestamp  = dec.timestamp or f.timestamp  or f.created_at or "",
+        }
+    end
+    return f -- legacy plaintext row
+end
+
+-- ISO 8601 timestamp helpers
+local function nowISO()
+    -- Supabase expects ISO8601 UTC: 2026-05-21T14:32:00.000Z
+    -- os.time() is UTC seconds since epoch; we format it manually
+    local t = os.time()
+    local d = os.date("!*t", t)
+    return string.format("%04d-%02d-%02dT%02d:%02d:%02d.000Z",
+        d.year, d.month, d.day, d.hour, d.min, d.sec)
+end
+
+local function isoToUnix(iso)
+    if not iso then return 0 end
+    local yr,mo,dy,hr,mn,sc = iso:match("(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
+    if not yr then return 0 end
+    -- Simple UTC epoch calc (no leap second handling needed)
+    local days = 0
+    yr,mo,dy,hr,mn,sc = tonumber(yr),tonumber(mo),tonumber(dy),tonumber(hr),tonumber(mn),tonumber(sc)
+    local mdays = {31,28,31,30,31,30,31,31,30,31,30,31}
+    for y = 1970, yr-1 do
+        days = days + 365
+        if (y%4==0 and y%100~=0) or y%400==0 then days=days+1 end
+    end
+    if (yr%4==0 and yr%100~=0) or yr%400==0 then mdays[2]=29 end
+    for m = 1, mo-1 do days = days + mdays[m] end
+    days = days + dy - 1
+    return days*86400 + hr*3600 + mn*60 + sc
+end
+
+-- Start cursor at NOW so only rows inserted after execute are shown
+local _lastISO  = nowISO()
+local _pollFail = 0
+
+-- Reliable HTTP polling (primary data source)
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(2.5)
+        local ok, rows = pcall(sbGet,
+            "/rest/v1/finds?created_at=gt."..HttpService:UrlEncode(_lastISO)
+            .."&order=created_at.asc&limit=80")
+        if ok and type(rows)=="table" then
+            _pollFail = 0
+            if _connState ~= "connected" then setConnState("connected") end
+            local newISO = _lastISO
+            for _, f in ipairs(rows) do
+                -- decrypt encrypted rows; pass legacy plaintext rows through
+                local r = _decRow(f)
+                if r then
+                    local rowTS = r.created_at or r.timestamp or ""
+                    if rowTS ~= "" and rowTS > newISO then
+                        local name  = r.name or ""
+                        local v     = parseGenVal(r.gen_text or "")
+                        local jobId = (r.job_id and r.job_id ~= "") and r.job_id or nil
+                        local pid   = (r.place_id and r.place_id ~= "") and r.place_id or game.PlaceId
+                        if name ~= "" then
+                            local dbKey = jobId or (name .. "_" .. rowTS)
+                            addLog(dbKey, name, v, jobId, pid, false)
+                        end
+                        newISO = rowTS
+                    end
+                end
+            end
+            _lastISO = newISO
+        else
+            _pollFail = _pollFail + 1
+            if _pollFail >= 3 then setConnState("disconnected") end
+        end
+    end
+end)
+
+-- Optional WS for instant delivery (bonus -- falls back to poll gracefully)
+task.spawn(function()
+    task.wait(2) -- let poll establish connection first
+    local wsLib = (type(WebSocket)=="table" and WebSocket)
+        or (type(syn)=="table" and type(syn.websocket)=="table" and syn.websocket)
+    if not wsLib then return end -- no WS support, poll handles everything
+
+    local wsUrl = SUPABASE_URL:gsub("^https","wss")
+        .."/realtime/v1/websocket?apikey="..SUPABASE_KEY.."&vsn=1.0.0"
+
+    while ScreenGui.Parent do
+        local ok, ws = pcall(function() return wsLib.connect(wsUrl) end)
+        if not ok or not ws then task.wait(10); continue end
+
+        pcall(function()
+            ws:Send(HttpService:JSONEncode({
+                event="phx_join", topic="realtime:public:finds",
+                payload={config={postgres_changes={{event="INSERT",schema="public",table="finds"}}},
+                         access_token=SUPABASE_KEY},
+                ref="1"
+            }))
+        end)
+
+        local alive = true
+        ws.OnMessage:Connect(function(raw)
+            local ok2,msg = pcall(HttpService.JSONDecode,HttpService,raw)
+            if not ok2 or type(msg)~="table" then return end
+            local rec = msg.payload and msg.payload.record
+            if type(rec)~="table" then return end
+            local r = _decRow(rec)
+            if not r then return end
+            local name  = r.name or ""
+            local jobId = (r.job_id and r.job_id ~= "") and r.job_id or nil
+            local pid   = (r.place_id and r.place_id ~= "") and r.place_id or game.PlaceId
+            local rowTS = r.created_at or r.timestamp or ""
+            if name == "" then return end
+            local v = parseGenVal(r.gen_text or "")
+            local dbKey = jobId or (name .. "_" .. rowTS)
+            if rowTS ~= "" and rowTS > _lastISO then _lastISO = rowTS end
+            addLog(dbKey, name, v, jobId, pid, false)
+        end)
+        ws.OnClose:Connect(function() alive=false end)
+
+        -- heartbeat
+        task.spawn(function()
+            while alive and ScreenGui.Parent do
+                task.wait(20)
+                pcall(function() ws:Send(HttpService:JSONEncode(
+                    {event="heartbeat",topic="phoenix",payload={},ref="hb"})) end)
+            end
+        end)
+
+        while alive and ScreenGui.Parent do task.wait(1) end
+        task.wait(5)
+    end
+end)
+
+-- ═══ USERNAME TRACKING + ESP ═══
+local _playerName = Player.Name
+local _userId     = tostring(Player.UserId)
+
+-- Register user in Supabase
+pcall(function()
+    sbPost("/rest/v1/dragon_users", {
+        username  = _playerName,
+        user_id   = _userId,
+        joined_at = math.floor(os.time()),
+        active    = true,
+    })
+end)
+
+-- Delete user on script destroy / key expiry
+ScreenGui.Destroying:Connect(function()
+    pcall(function()
+        if httpReq then
+            httpReq({
+                Url    = SUPABASE_URL.."/rest/v1/dragon_users?user_id=eq.".._userId,
+                Method = "DELETE",
+                Headers= {["apikey"]=SUPABASE_KEY,["Authorization"]="Bearer "..SUPABASE_KEY},
+            })
+        end
+    end)
+end)
+
+-- ESP -- Highlight + BillboardGui (Lion-style)
+local _selfVisuals = nil
+local function _createESP(char, isLocal)
+    if not char or not char:FindFirstChildWhichIsA("BasePart") then return nil end
+    local head = char:FindFirstChild("Head") or char.PrimaryPart
+    -- Highlight (works through walls, no ZIndex issues)
+    local hl = Instance.new("Highlight")
+    hl.Name = "DragonNotifierHL"; hl.Adornee = char
+    hl.FillColor        = Color3.fromRGB(255, 130, 30)
+    hl.OutlineColor     = Color3.fromRGB(255, 200, 80)
+    hl.FillTransparency    = 0.45
+    hl.OutlineTransparency = 0.0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = char
+    -- BillboardGui tag
+    local bb = Instance.new("BillboardGui")
+    bb.Name="DragonNotifierTag"; bb.Adornee=head
+    bb.Size=UDim2.new(0,220,0,44); bb.StudsOffset=Vector3.new(0,2.8,0)
+    bb.AlwaysOnTop=true; bb.MaxDistance=500; bb.ResetOnSpawn=false; bb.Parent=head
+    local txt = Instance.new("TextLabel",bb)
+    txt.Size=UDim2.new(1,0,1,0); txt.BackgroundTransparency=1
+    txt.Text = isLocal and "[YOU] Dragon User" or "Dragon User"
+    txt.TextStrokeColor3=Color3.new(0,0,0); txt.TextStrokeTransparency=0.25
+    txt.Font=Enum.Font.GothamBlack; txt.TextScaled=true
+    -- animated silver↔orange shimmer on label
+    task.spawn(function()
+        while bb.Parent do
+            local t=os.clock()
+            local a=(math.sin(t*2)+1)*0.5
+            txt.TextColor3=Color3.fromRGB(
+                math.floor(200+55*a),
+                math.floor(130+70*a),
+                math.floor(30+200*(1-a))
+            )
+            task.wait(0.03)
+        end
+    end)
+    return {highlight=hl, tag=bb}
+end
+
+local function _removeESP(v)
+    if not v then return end
+    pcall(function() if v.highlight then v.highlight:Destroy() end end)
+    pcall(function() if v.tag then v.tag:Destroy() end end)
+end
+
+local function _addSelfESP()
+    _removeESP(_selfVisuals); _selfVisuals=nil
+    if Player.Character then _selfVisuals=_createESP(Player.Character,true) end
+end
+
+Player.CharacterAdded:Connect(function() task.delay(1.5,_addSelfESP) end)
+if Player.Character then task.delay(1.5,_addSelfESP) end
+
+-- Poll Supabase dragon_users and apply ESP to other users in same server
+local _otherESPs = {}  -- [username] = {visuals, lastSeen}
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(8)
+        pcall(function()
+            local rows = sbGet("/rest/v1/dragon_users?active=eq.true&select=username,user_id")
+            if type(rows) ~= "table" then return end
+            local activeNames = {}
+            for _, row in ipairs(rows) do
+                local uname = row.username
+                if uname and uname ~= Player.Name then
+                    activeNames[uname] = true
+                    -- Try to find this player in current server
+                    local plr = Players:FindFirstChild(uname)
+                    if plr and plr.Character and plr.Character:FindFirstChildWhichIsA("BasePart") then
+                        if not _otherESPs[uname] or not _otherESPs[uname].visuals then
+                            if _otherESPs[uname] then
+                                _removeESP(_otherESPs[uname].visuals)
+                            end
+                            _otherESPs[uname] = {
+                                visuals  = _createESP(plr.Character, false),
+                                lastSeen = tick(),
+                            }
+                            -- re-apply on respawn
+                            plr.CharacterAdded:Connect(function(c)
+                                task.delay(1.5, function()
+                                    if _otherESPs[uname] then
+                                        _removeESP(_otherESPs[uname].visuals)
+                                        _otherESPs[uname].visuals = _createESP(c, false)
+                                    end
+                                end)
+                            end)
+                        else
+                            _otherESPs[uname].lastSeen = tick()
+                        end
+                    end
+                end
+            end
+            -- Remove ESP for users no longer in dragon_users or not in server
+            for uname, data in pairs(_otherESPs) do
+                if not activeNames[uname] then
+                    _removeESP(data.visuals); _otherESPs[uname] = nil
+                end
+            end
+        end)
+    end
+end)
+
+-- -- Sync all toggle visuals now that UI is fully built
+task.defer(function()
+    setWlToggle(SettingsState.UseWhitelist)
+    setAutoJoin(false)  -- always OFF on load regardless of saved config
+    if whitelistRefreshList then pcall(whitelistRefreshList) end
+    refreshMinRows()
+    local _c = 0
+    for _, v in pairs(WhitelistSelected) do if v then _c = _c + 1 end end
+    wlCountLbl.Text = _c .. " selected"
+end)
+
+-- Auto-minimize on load
+if SettingsState.AutoMinimize then
+    task.defer(function()
+        if MainFrame then
+            MainFrame.Size = UDim2.new(0, MainFrame.Size.X.Offset, 0, 76)
+        end
+    end)
+end
+end)()  -- close supabase IIFE
+
+
+
+
+end)()
+print("[Dragon Notifier] Galaxy v3 loaded")
+
+-- ════════════════════════════════════════════════════════════════
+-- RELAY POLL  (replaces the supabase poll)
+-- Polls the railway /latest endpoint every ~2.5s. Decrypts the
+-- payload blob and the embedded jobId, then dedupes by jobId and
+-- routes to the existing addLog/auto-join handler.
+-- ════════════════════════════════════════════════════════════════
+do
+    -- Decode the encrypted RELAY URL using the same _sKB the vault uses.
+    -- _CT_RELAY was injected above (chunks of XOR-encoded base64).
+    local function _decRelay()
+        local b64 = table.concat(_CT_RELAY)
+        local enc = (function()
+            local a = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+            local m = {}
+            for i = 1, #a do m[string.sub(a, i, i)] = i - 1 end
+            local s = string.gsub(b64, "[^A-Za-z0-9+/=]", "")
+            local out = {}
+            for i = 1, #s, 4 do
+                local c1 = m[string.sub(s,i,i)]     or 0
+                local c2 = m[string.sub(s,i+1,i+1)] or 0
+                local c3 = m[string.sub(s,i+2,i+2)] or 0
+                local c4 = m[string.sub(s,i+3,i+3)] or 0
+                local n = c1*262144 + c2*4096 + c3*64 + c4
+                out[#out+1] = string.char(math.floor(n / 65536) % 256)
+                if string.sub(s,i+2,i+2) ~= "=" then out[#out+1] = string.char(math.floor(n / 256) % 256) end
+                if string.sub(s,i+3,i+3) ~= "=" then out[#out+1] = string.char(n % 256) end
+            end
+            return table.concat(out)
+        end)()
+        local out = {}
+        for i = 1, #enc do
+            out[i] = string.char(bit32.bxor(string.byte(enc, i), _sKB[((i - 1) % 64) + 1]))
+        end
+        return table.concat(out)
+    end
+
+    local seenJobs = {}
+    local httpReq = (syn and syn.request) or (fluxus and fluxus.request)
+        or (krnl and krnl.request) or (http and http.request)
+        or request or http_request
+
+    task.spawn(function()
+        local relayUrl = _decRelay()
+        while task.wait(2.5) do
+            if not httpReq then return end
+            local ok, res = pcall(httpReq, {
+                Url = relayUrl .. "/latest",
+                Method = "GET",
+                Headers = { ["Content-Type"] = "application/json" },
+            })
+            if not ok or not res then continue end
+            local body = res.Body or res.body
+            if not body or body == "" then continue end
+            local okJ, data = pcall(function()
+                return game:GetService("HttpService"):JSONDecode(body)
+            end)
+            if not okJ or not data or not data.detections then continue end
+
+            for _, det in ipairs(data.detections) do
+                if det.items then
+                    for _, item in ipairs(det.items) do
+                        local enc = item.payload
+                        if enc then
+                            local plain = _decPayload(enc)
+                            if plain then
+                                local okI, info = pcall(function()
+                                    return game:GetService("HttpService"):JSONDecode(plain)
+                                end)
+                                if okI and info and info.job_id then
+                                    local realJob = _decJob(info.job_id)
+                                    if realJob and not seenJobs[realJob] then
+                                        seenJobs[realJob] = true
+                                        -- Hand off to existing log handler if present.
+                                        if type(addLog) == "function" then
+                                            pcall(addLog,
+                                                info.name or "Unknown",
+                                                tonumber(info.gen_text and info.gen_text:match("[%d%.]+")) or 0,
+                                                realJob,
+                                                info.place_id)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
